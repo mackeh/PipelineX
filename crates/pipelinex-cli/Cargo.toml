@@ -1,0 +1,20 @@
+[package]
+name = "pipelinex-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "CLI tool for PipelineX CI/CD bottleneck analyzer"
+
+[[bin]]
+name = "pipelinex"
+path = "src/main.rs"
+
+[dependencies]
+pipelinex-core = { path = "../pipelinex-core" }
+clap = { workspace = true }
+colored = { workspace = true }
+anyhow = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+similar = { workspace = true }
+glob = { workspace = true }

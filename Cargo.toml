@@ -1,0 +1,23 @@
+[workspace]
+members = ["crates/pipelinex-core", "crates/pipelinex-cli"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/mackeh/PipelineX"
+description = "CI/CD Bottleneck Analyzer & Auto-Optimizer"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+thiserror = "2"
+petgraph = "0.7"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+colored = "3"
+similar = "2"
+glob = "0.3"
+regex = "1"
