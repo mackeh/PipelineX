@@ -1,6 +1,8 @@
 use colored::*;
 use pipelinex_core::analyzer::report::{AnalysisReport, Finding, Severity, format_duration};
 use pipelinex_core::cost::CostEstimate;
+use pipelinex_core::simulator::SimulationResult;
+use pipelinex_core::optimizer::docker_opt::{DockerAnalysis, DockerSeverity};
 use similar::{ChangeTag, TextDiff};
 use std::path::Path;
 
@@ -9,7 +11,7 @@ pub fn print_analysis_report(report: &AnalysisReport) {
     println!();
     println!(
         "{}",
-        format!(" PipelineX v0.1.0 — Analyzing {}", report.source_file).bold()
+        format!(" PipelineX v{} — Analyzing {}", env!("CARGO_PKG_VERSION"), report.source_file).bold()
     );
     println!();
 
@@ -31,6 +33,11 @@ pub fn print_analysis_report(report: &AnalysisReport) {
         "|-".dimmed(),
         report.critical_path.join(" -> "),
         format_duration(report.critical_path_duration_secs)
+    );
+    println!(
+        " {} Provider: {}",
+        "|-".dimmed(),
+        report.provider.cyan()
     );
     println!();
 
@@ -101,7 +108,15 @@ pub fn print_analysis_report(report: &AnalysisReport) {
         );
         println!(
             " Run {} to see changes",
-            format!("pipelinex optimize {} --diff", report.source_file).cyan()
+            format!("pipelinex diff {}", report.source_file).cyan()
+        );
+        println!(
+            " Run {} to simulate timing",
+            format!("pipelinex simulate {}", report.source_file).cyan()
+        );
+        println!(
+            " Run {} to visualize the DAG",
+            format!("pipelinex graph {}", report.source_file).cyan()
         );
     }
     println!();
@@ -256,5 +271,148 @@ pub fn print_cost_report(
             .green()
             .bold()
     );
+    println!();
+}
+
+/// Print Monte Carlo simulation results.
+pub fn print_simulation_report(pipeline_name: &str, result: &SimulationResult) {
+    println!();
+    println!(
+        "{}",
+        format!(" PipelineX Simulation — {} ({} runs)", pipeline_name, result.runs).bold()
+    );
+    println!();
+
+    // Duration distribution
+    println!(" {}", "Duration Distribution".bold().underline());
+    println!(
+        "   Min:     {}",
+        format_duration(result.min_duration_secs)
+    );
+    println!(
+        "   p50:     {}",
+        format_duration(result.p50_duration_secs).green()
+    );
+    println!(
+        "   p75:     {}",
+        format_duration(result.p75_duration_secs)
+    );
+    println!(
+        "   p90:     {}",
+        format_duration(result.p90_duration_secs).yellow()
+    );
+    println!(
+        "   p99:     {}",
+        format_duration(result.p99_duration_secs).red()
+    );
+    println!(
+        "   Max:     {}",
+        format_duration(result.max_duration_secs)
+    );
+    println!(
+        "   Mean:    {} (std dev: {})",
+        format_duration(result.mean_duration_secs),
+        format_duration(result.std_dev_secs)
+    );
+    println!();
+
+    // Histogram
+    println!(" {}", "Timing Histogram".bold().underline());
+    for bucket in &result.histogram {
+        if bucket.count > 0 {
+            let label = format!(
+                "   {:>6} - {:>6}",
+                format_duration(bucket.lower_bound_secs),
+                format_duration(bucket.upper_bound_secs)
+            );
+            let bar = "#".repeat(bucket.bar.len()).blue().to_string();
+            println!("{} {} {}", label, bar, bucket.count);
+        }
+    }
+    println!();
+
+    // Job stats
+    if !result.job_stats.is_empty() {
+        println!(" {}", "Job Analysis".bold().underline());
+        println!(
+            "   {:<20} {:>8} {:>8} {:>8} {:>10}",
+            "Job".underline(),
+            "Mean".underline(),
+            "p50".underline(),
+            "p90".underline(),
+            "Crit.Path%".underline()
+        );
+        for job in &result.job_stats {
+            let crit_color = if job.on_critical_path_pct > 80.0 {
+                format!("{:.0}%", job.on_critical_path_pct).red().to_string()
+            } else if job.on_critical_path_pct > 50.0 {
+                format!("{:.0}%", job.on_critical_path_pct).yellow().to_string()
+            } else {
+                format!("{:.0}%", job.on_critical_path_pct)
+            };
+
+            println!(
+                "   {:<20} {:>8} {:>8} {:>8} {:>10}",
+                job.job_id,
+                format_duration(job.mean_duration_secs),
+                format_duration(job.p50_duration_secs),
+                format_duration(job.p90_duration_secs),
+                crit_color,
+            );
+        }
+    }
+    println!();
+}
+
+/// Print Docker analysis results.
+pub fn print_docker_analysis(path: &Path, analysis: &DockerAnalysis) {
+    println!();
+    println!(
+        "{}",
+        format!(" PipelineX Docker Analysis — {}", path.display()).bold()
+    );
+    println!();
+
+    println!(
+        " {} Est. build time (current):   {}",
+        "|-".dimmed(),
+        format_duration(analysis.estimated_build_time_before)
+    );
+    println!(
+        " {} Est. build time (optimized): {}",
+        "|-".dimmed(),
+        format_duration(analysis.estimated_build_time_after).green()
+    );
+    println!();
+
+    if analysis.findings.is_empty() {
+        println!(" {} {}", "OK".green().bold(), "Dockerfile looks well-optimized!");
+    } else {
+        println!(" {}", "=".repeat(60).dimmed());
+        println!();
+
+        for finding in &analysis.findings {
+            let tag = match finding.severity {
+                DockerSeverity::Critical => " CRITICAL ".on_red().white().bold().to_string(),
+                DockerSeverity::Warning => " WARNING ".on_yellow().black().bold().to_string(),
+                DockerSeverity::Info => " INFO ".on_blue().white().to_string(),
+            };
+
+            println!(" {} {}", tag, finding.title.bold());
+            println!("   {} {}", "|".dimmed(), finding.description);
+            if let Some(line) = finding.line_number {
+                println!("   {} Line: {}", "|".dimmed(), line);
+            }
+            println!("   {} Fix: {}", "|".dimmed(), finding.fix.cyan());
+            println!();
+        }
+
+        println!(" {}", "=".repeat(60).dimmed());
+        println!();
+        println!(
+            " Run {} to generate an optimized Dockerfile",
+            format!("pipelinex docker {} --optimize", path.display()).cyan()
+        );
+    }
     println!();
 }

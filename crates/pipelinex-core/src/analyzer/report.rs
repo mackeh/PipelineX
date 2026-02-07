@@ -43,7 +43,7 @@ impl Severity {
 }
 
 /// Category of the finding.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum FindingCategory {
     CriticalPath,
     MissingCache,

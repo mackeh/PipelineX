@@ -1,5 +1,7 @@
 pub mod cache_gen;
 pub mod parallel_gen;
+pub mod shard_gen;
+pub mod docker_opt;
 
 use crate::analyzer::report::AnalysisReport;
 use anyhow::Result;

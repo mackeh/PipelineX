@@ -1,0 +1,51 @@
+stages:
+  - build
+  - test
+  - scan
+  - deploy
+
+variables:
+  REGISTRY: registry.example.com
+  IMAGE_TAG: $CI_COMMIT_SHORT_SHA
+
+build:docker:
+  stage: build
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker build -t $REGISTRY/app:$IMAGE_TAG .
+    - docker push $REGISTRY/app:$IMAGE_TAG
+
+unit-test:
+  stage: test
+  image: golang:1.22
+  script:
+    - go test ./...
+
+lint:
+  stage: test
+  image: golangci/golangci-lint:latest
+  script:
+    - golangci-lint run
+
+security-scan:
+  stage: scan
+  needs:
+    - unit-test
+    - lint
+  image: aquasec/trivy:latest
+  script:
+    - trivy image $REGISTRY/app:$IMAGE_TAG
+
+deploy:k8s:
+  stage: deploy
+  needs:
+    - security-scan
+    - job: build:docker
+  image: bitnami/kubectl:latest
+  script:
+    - kubectl set image deployment/app app=$REGISTRY/app:$IMAGE_TAG
+  environment:
+    name: production
+  when: manual

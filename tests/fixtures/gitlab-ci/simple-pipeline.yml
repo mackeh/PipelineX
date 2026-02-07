@@ -1,0 +1,32 @@
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  NODE_ENV: production
+
+build:
+  stage: build
+  image: node:20
+  script:
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - dist/
+
+test:
+  stage: test
+  image: node:20
+  script:
+    - npm ci
+    - npm test
+
+deploy:
+  stage: deploy
+  image: node:20
+  script:
+    - npm run deploy
+  only:
+    - main

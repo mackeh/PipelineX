@@ -1,0 +1,256 @@
+use pipelinex_core::parser::github::GitHubActionsParser;
+use pipelinex_core::parser::gitlab::GitLabCIParser;
+use pipelinex_core::analyzer;
+use pipelinex_core::optimizer::Optimizer;
+use pipelinex_core::optimizer::docker_opt;
+use std::path::{Path, PathBuf};
+
+/// Get the workspace root (two levels up from CARGO_MANIFEST_DIR of pipelinex-core).
+fn fixtures_dir() -> PathBuf {
+    let manifest_dir = env!("CARGO_MANIFEST_DIR");
+    Path::new(manifest_dir)
+        .parent().unwrap()  // crates/
+        .parent().unwrap()  // workspace root
+        .join("tests/fixtures")
+}
+
+fn github_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("github-actions").join(name)
+}
+
+fn gitlab_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("gitlab-ci").join(name)
+}
+
+fn docker_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("dockerfiles").join(name)
+}
+
+// ─── GitHub Actions integration tests ───
+
+#[test]
+fn test_analyze_unoptimized_fullstack() {
+    let path = github_fixture("unoptimized-fullstack.yml");
+    let dag = GitHubActionsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.job_count, 6);
+    assert!(report.findings.len() >= 3, "Expected at least 3 findings");
+    assert!(
+        report.potential_improvement_pct() > 10.0,
+        "Expected significant improvement potential"
+    );
+    assert!(report.findings.iter().any(|f| f.category == pipelinex_core::analyzer::report::FindingCategory::MissingCache));
+}
+
+#[test]
+fn test_analyze_optimized_example_has_fewer_findings() {
+    let path = github_fixture("optimized-example.yml");
+    let dag = GitHubActionsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    let critical = report.critical_count();
+    assert!(
+        critical <= 4,
+        "Optimized pipeline should have few critical findings, got {}",
+        critical
+    );
+}
+
+#[test]
+fn test_analyze_rust_project() {
+    let path = github_fixture("rust-project.yml");
+    let dag = GitHubActionsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert!(report.job_count >= 3);
+    assert!(
+        report.findings.iter().any(|f| {
+            f.category == pipelinex_core::analyzer::report::FindingCategory::SerialBottleneck
+                || f.category == pipelinex_core::analyzer::report::FindingCategory::CriticalPath
+        }),
+        "Should detect bottleneck or false dependency in serial Rust pipeline"
+    );
+}
+
+#[test]
+fn test_analyze_monorepo_ci() {
+    let path = github_fixture("monorepo-ci.yml");
+    let dag = GitHubActionsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert!(report.job_count >= 6);
+    assert!(report.max_parallelism >= 2);
+}
+
+#[test]
+fn test_analyze_docker_publish() {
+    let path = github_fixture("docker-publish.yml");
+    let dag = GitHubActionsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.job_count, 3);
+    assert!(report.max_parallelism >= 2, "lint and test should run in parallel");
+}
+
+#[test]
+fn test_optimize_produces_valid_yaml() {
+    let path = github_fixture("unoptimized-fullstack.yml");
+    let dag = GitHubActionsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+    let optimized = Optimizer::optimize(&path, &report).unwrap();
+
+    let parsed: serde_yaml::Value = serde_yaml::from_str(&optimized).unwrap();
+    assert!(parsed.get("jobs").is_some(), "Optimized YAML should have jobs");
+}
+
+#[test]
+fn test_sarif_output_valid_json() {
+    let path = github_fixture("unoptimized-fullstack.yml");
+    let dag = GitHubActionsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+    let sarif = pipelinex_core::analyzer::sarif::to_sarif(&report);
+    let json = serde_json::to_string_pretty(&sarif).unwrap();
+
+    let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+    assert_eq!(
+        parsed["version"].as_str().unwrap(),
+        "2.1.0",
+        "SARIF version should be 2.1.0"
+    );
+}
+
+#[test]
+fn test_graph_outputs() {
+    let path = github_fixture("unoptimized-fullstack.yml");
+    let dag = GitHubActionsParser::parse_file(&path).unwrap();
+
+    let mermaid = pipelinex_core::graph::to_mermaid(&dag);
+    assert!(mermaid.contains("graph LR"));
+    assert!(mermaid.contains("-->"));
+
+    let dot = pipelinex_core::graph::to_dot(&dag);
+    assert!(dot.contains("digraph"));
+    assert!(dot.contains("->"));
+
+    let ascii = pipelinex_core::graph::to_ascii(&dag);
+    assert!(!ascii.is_empty());
+}
+
+#[test]
+fn test_simulation_with_fixture() {
+    let path = github_fixture("unoptimized-fullstack.yml");
+    let dag = GitHubActionsParser::parse_file(&path).unwrap();
+    let result = pipelinex_core::simulator::simulate(&dag, 200, 0.15);
+
+    assert_eq!(result.runs, 200);
+    assert!(result.mean_duration_secs > 0.0);
+    assert!(result.p90_duration_secs >= result.p50_duration_secs);
+    assert_eq!(result.job_stats.len(), 6);
+    assert!(!result.histogram.is_empty());
+}
+
+#[test]
+fn test_cost_estimation() {
+    let path = github_fixture("unoptimized-fullstack.yml");
+    let dag = GitHubActionsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    let estimate = pipelinex_core::cost::estimate_costs(
+        report.total_estimated_duration_secs,
+        report.optimized_duration_secs,
+        500,
+        "ubuntu-latest",
+        150.0,
+        10,
+    );
+
+    assert!(estimate.compute_cost_per_run > 0.0);
+    assert!(estimate.monthly_compute_cost > 0.0);
+    assert!(estimate.waste_ratio > 0.0);
+}
+
+// ─── GitLab CI integration tests ───
+
+#[test]
+fn test_analyze_gitlab_simple() {
+    let path = gitlab_fixture("simple-pipeline.yml");
+    let dag = GitLabCIParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.provider, "gitlab-ci");
+    assert!(report.job_count >= 3);
+}
+
+#[test]
+fn test_analyze_gitlab_monorepo() {
+    let path = gitlab_fixture("monorepo-pipeline.yml");
+    let dag = GitLabCIParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert!(report.job_count >= 5);
+}
+
+#[test]
+fn test_analyze_gitlab_kubernetes() {
+    let path = gitlab_fixture("kubernetes-deploy.yml");
+    let dag = GitLabCIParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert!(report.job_count >= 4);
+}
+
+// ─── Docker optimization integration tests ───
+
+#[test]
+fn test_docker_analyze_unoptimized_node() {
+    let content = std::fs::read_to_string(docker_fixture("unoptimized-node.Dockerfile")).unwrap();
+    let analysis = docker_opt::analyze_dockerfile(&content);
+
+    assert!(analysis.findings.len() >= 2, "Should detect multiple issues");
+    assert!(
+        analysis.findings.iter().any(|f| f.title.contains("COPY . . before")),
+        "Should detect COPY before install"
+    );
+    assert!(analysis.optimized_dockerfile.is_some());
+}
+
+#[test]
+fn test_docker_analyze_optimized_has_fewer_issues() {
+    let content = std::fs::read_to_string(docker_fixture("optimized-node.Dockerfile")).unwrap();
+    let analysis = docker_opt::analyze_dockerfile(&content);
+
+    let unoptimized = std::fs::read_to_string(docker_fixture("unoptimized-node.Dockerfile")).unwrap();
+    let unopt_analysis = docker_opt::analyze_dockerfile(&unoptimized);
+
+    assert!(
+        analysis.findings.len() <= unopt_analysis.findings.len(),
+        "Optimized Dockerfile should have fewer findings ({} vs {})",
+        analysis.findings.len(),
+        unopt_analysis.findings.len()
+    );
+}
+
+#[test]
+fn test_docker_analyze_python() {
+    let content = std::fs::read_to_string(docker_fixture("python-app.Dockerfile")).unwrap();
+    let analysis = docker_opt::analyze_dockerfile(&content);
+
+    assert!(!analysis.findings.is_empty());
+    assert!(
+        analysis.findings.iter().any(|f| f.title.contains("Non-slim")),
+        "Should detect non-slim Python image"
+    );
+}
+
+#[test]
+fn test_docker_analyze_go() {
+    let content = std::fs::read_to_string(docker_fixture("go-service.Dockerfile")).unwrap();
+    let analysis = docker_opt::analyze_dockerfile(&content);
+
+    assert!(!analysis.findings.is_empty());
+    assert!(
+        analysis.findings.iter().any(|f| f.title.contains("multi-stage")),
+        "Should recommend multi-stage build for Go"
+    );
+}

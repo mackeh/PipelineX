@@ -3,6 +3,7 @@ pub mod cache_detector;
 pub mod parallel_finder;
 pub mod waste_detector;
 pub mod report;
+pub mod sarif;
 
 use crate::parser::dag::PipelineDag;
 use report::{AnalysisReport, Finding};
