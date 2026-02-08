@@ -3,6 +3,10 @@ import { constants } from "node:fs";
 import { appendFile, access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { NextResponse } from "next/server";
+import {
+  authenticateEnterpriseSessionRequest,
+  isEnterpriseSessionAuthEnabled,
+} from "@/lib/enterprise-auth";
 
 export type PublicApiScope = "benchmarks:read" | "benchmarks:write" | "audit:read";
 
@@ -593,6 +597,13 @@ export async function authenticatePublicApiRequest(
   const requestId = parseRequestId(request);
   const clientIp = parseClientIp(request);
   const userAgent = request.headers.get("user-agent") || "unknown";
+  const enterpriseEnabled = isEnterpriseSessionAuthEnabled();
+  const hasApiKeyHeader = Boolean(request.headers.get("x-api-key")?.trim());
+  const authHeader = request.headers.get("authorization")?.trim() || "";
+  const bearerToken = authHeader.toLowerCase().startsWith("bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
+  const bearerLooksEnterprise = bearerToken.startsWith("pxe.");
 
   let configuredKeys: ApiKeyConfig[];
   try {
@@ -607,53 +618,93 @@ export async function authenticatePublicApiRequest(
     );
   }
 
-  if (configuredKeys.length === 0) {
+  if (configuredKeys.length === 0 && !enterpriseEnabled) {
     return buildAuthFailure(
       request,
       requestId,
       requiredScope,
       503,
-      "Public API is not configured. Set PIPELINEX_API_KEY, PIPELINEX_API_KEYS, or PIPELINEX_API_KEYS_FILE.",
+      "Public API is not configured. Set PIPELINEX_API_KEY, PIPELINEX_API_KEYS, PIPELINEX_API_KEYS_FILE, or enterprise session auth.",
     );
   }
 
   const incomingKey = extractApiKey(request);
-  if (!incomingKey) {
-    return buildAuthFailure(
-      request,
-      requestId,
-      requiredScope,
-      401,
-      "Missing API key. Use Authorization: Bearer <token>.",
-    );
-  }
+  const matched = incomingKey
+    ? configuredKeys.find((config) => safeKeyMatch(config.key, incomingKey))
+    : undefined;
 
-  const matched = configuredKeys.find((config) => safeKeyMatch(config.key, incomingKey));
-  if (!matched) {
-    return buildAuthFailure(
-      request,
-      requestId,
-      requiredScope,
-      401,
-      "Invalid API key.",
-    );
-  }
+  let principalId = "";
+  let principalScopes: PublicApiScope[] = [];
+  let principalRoles: PublicApiRole[] = [];
+  let rateLimitPerMinute = DEFAULT_RATE_LIMIT;
 
-  if (!matched.scopes.includes(requiredScope)) {
-    return buildAuthFailure(
-      request,
-      requestId,
-      requiredScope,
-      403,
-      `Insufficient scope. Required scope: ${requiredScope}.`,
-      matched.id,
-    );
+  if (matched) {
+    if (!matched.scopes.includes(requiredScope)) {
+      return buildAuthFailure(
+        request,
+        requestId,
+        requiredScope,
+        403,
+        `Insufficient scope. Required scope: ${requiredScope}.`,
+        matched.id,
+      );
+    }
+
+    principalId = matched.id;
+    principalScopes = matched.scopes;
+    principalRoles = matched.roles;
+    rateLimitPerMinute = matched.rateLimitPerMinute;
+  } else {
+    const enterpriseAuth = enterpriseEnabled
+      ? authenticateEnterpriseSessionRequest(request, requiredScope)
+      : ({
+          ok: false,
+          status: 401,
+          message: "Enterprise session auth is not configured.",
+        } as const);
+
+    if (enterpriseAuth.ok) {
+      principalId = `enterprise:${enterpriseAuth.principal.subject}`;
+      principalScopes = enterpriseAuth.principal.scopes;
+      principalRoles = enterpriseAuth.principal.roles;
+      rateLimitPerMinute = parseRateLimit(
+        process.env.PIPELINEX_ENTERPRISE_RATE_LIMIT_PER_MINUTE,
+        DEFAULT_RATE_LIMIT,
+      );
+    } else if (!incomingKey) {
+      return buildAuthFailure(
+        request,
+        requestId,
+        requiredScope,
+        401,
+        enterpriseEnabled
+          ? "Missing credentials. Use API key (x-api-key) or enterprise session token."
+          : "Missing API key. Use Authorization: Bearer <token>.",
+      );
+    } else if (!hasApiKeyHeader && bearerLooksEnterprise && enterpriseEnabled) {
+      return buildAuthFailure(
+        request,
+        requestId,
+        requiredScope,
+        enterpriseAuth.status,
+        enterpriseAuth.message,
+        "enterprise:anonymous",
+      );
+    } else {
+      return buildAuthFailure(
+        request,
+        requestId,
+        requiredScope,
+        401,
+        "Invalid API key.",
+      );
+    }
   }
 
   const rateLimit = await consumeRateLimit(
-    matched.id,
+    principalId,
     clientIp,
-    matched.rateLimitPerMinute,
+    rateLimitPerMinute,
   );
   if (rateLimit.blocked) {
     const response = NextResponse.json(
@@ -664,7 +715,7 @@ export async function authenticatePublicApiRequest(
     await auditPublicApiRequest({
       timestamp: new Date().toISOString(),
       requestId,
-      keyId: matched.id,
+      keyId: principalId,
       scope: requiredScope,
       method: request.method,
       path: new URL(request.url).pathname,
@@ -680,9 +731,9 @@ export async function authenticatePublicApiRequest(
   return {
     ok: true,
     principal: {
-      id: matched.id,
-      scopes: matched.scopes,
-      roles: matched.roles,
+      id: principalId,
+      scopes: principalScopes,
+      roles: principalRoles,
     },
     requiredScope,
     rateLimit,
