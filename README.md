@@ -787,8 +787,8 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 - **Phase 1:** ✅ Core engine, GitHub Actions parser, CLI
 - **Phase 2:** ✅ Multi-platform (5 CI systems), simulation, visualization
-- **Phase 3:** 🚧 Smart features (test selection, flaky detection) - 2/6 complete
-- **Phase 4:** 📋 Planned (VS Code extension, web dashboard, GitHub App)
+- **Phase 3:** 🚧 Platform features in progress (live dashboard + API endpoints started)
+- **Phase 4:** 📋 Planned (VS Code extension, GitHub App, enterprise features)
 
 ---
 

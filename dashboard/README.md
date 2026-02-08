@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PipelineX Dashboard (Phase 3 Starter)
 
-## Getting Started
+This dashboard is now wired to the real PipelineX CLI analyzer.
 
-First, run the development server:
+## What it does
+
+- Discovers pipeline configs from:
+  - `.github/workflows`
+  - `tests/fixtures`
+- Runs live analysis via:
+  - `POST /api/analyze`
+  - `GET /api/workflows`
+- Renders real metrics, severity breakdown, critical path, and recommendations.
+
+## Run locally
+
+From repository root:
 
 ```bash
+cd dashboard
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API contract
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### `GET /api/workflows`
 
-## Learn More
+Response:
 
-To learn more about Next.js, take a look at the following resources:
+```json
+{
+  "files": [
+    ".github/workflows/ci.yml",
+    "tests/fixtures/github-actions/simple-ci.yml"
+  ]
+}
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### `POST /api/analyze`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Request:
 
-## Deploy on Vercel
+```json
+{
+  "pipelinePath": ".github/workflows/ci.yml"
+}
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Response:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```json
+{
+  "report": {
+    "pipeline_name": "CI",
+    "provider": "github-actions",
+    "findings": []
+  }
+}
+```
+
+## Notes
+
+- The API runs only on Node.js runtime (not Edge).
+- Paths are validated to stay inside repo root.
+- The route prefers local `target/debug/pipelinex` or `target/release/pipelinex`; otherwise it falls back to `cargo run -p pipelinex-cli`.
