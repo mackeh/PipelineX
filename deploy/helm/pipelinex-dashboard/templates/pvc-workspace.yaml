@@ -1,0 +1,17 @@
+{{- if and .Values.persistence.workspace.enabled (not .Values.persistence.workspace.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "pipelinex-dashboard.fullname" . }}-workspace
+  labels:
+    {{- include "pipelinex-dashboard.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.workspace.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.workspace.size }}
+  {{- if .Values.persistence.workspace.storageClass }}
+  storageClassName: {{ .Values.persistence.workspace.storageClass }}
+  {{- end }}
+{{- end }}

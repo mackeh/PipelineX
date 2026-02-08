@@ -1,0 +1,97 @@
+replicaCount: 1
+
+image:
+  repository: mackeh/pipelinex-dashboard
+  tag: latest
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 3000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: pipelinex.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+env:
+  PIPELINEX_REPO_ROOT: /workspace
+  PIPELINEX_PUBLIC_API_RATE_LIMIT_FILE: /data/public-api-rate-limits.json
+  PIPELINEX_PUBLIC_API_AUDIT_LOG_FILE: /data/public-api-audit.log
+
+extraEnv: []
+# Example:
+# extraEnv:
+#   - name: PIPELINEX_API_KEY
+#     value: "replace-me"
+#   - name: PIPELINEX_API_KEY_SCOPES
+#     value: "benchmarks:read,benchmarks:write"
+#   - name: PIPELINEX_API_KEY_ROLES
+#     value: "admin"
+#   - name: PIPELINEX_ENTERPRISE_SESSION_SECRET
+#     valueFrom:
+#       secretKeyRef:
+#         name: pipelinex-secrets
+#         key: enterprise-session-secret
+#   - name: PIPELINEX_SSO_SHARED_SECRET
+#     valueFrom:
+#       secretKeyRef:
+#         name: pipelinex-secrets
+#         key: sso-shared-secret
+
+existingSecret: ""
+
+persistence:
+  data:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 5Gi
+  workspace:
+    enabled: true
+    existingClaim: ""
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 10Gi
+
+workspaceBootstrap:
+  enabled: false
+  repoUrl: ""
+  branch: "main"
+  depth: 1
+  authSecretName: ""
+  authSecretKey: token

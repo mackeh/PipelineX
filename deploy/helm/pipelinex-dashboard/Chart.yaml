@@ -1,0 +1,6 @@
+apiVersion: v2
+name: pipelinex-dashboard
+description: Self-hosted PipelineX dashboard and API
+version: 0.1.0
+appVersion: "0.1.0"
+type: application
