@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runner right-sizing recommendations (based on resource profiling)
 - Multi-repo pipeline analysis (monorepo orchestration detection)
 
+## [1.2.1] - 2026-02-08
+
+### Fixed
+- Resolved CI pipeline failures by applying rustfmt formatting updates across recent parser/plugin files.
+- Resolved Clippy `-D warnings` failures in Buildkite parser and integration tests.
+- Restored green status for `check`, `fmt`, `clippy`, `test`, and release build jobs on `main`.
+
 ## [1.2.0] - 2026-02-08
 
 ### Added
@@ -153,6 +160,7 @@ See [GitHub Issues](https://github.com/mackeh/PipelineX/issues) for planned feat
 
 ---
 
+[1.2.1]: https://github.com/mackeh/PipelineX/releases/tag/v1.2.1
 [1.2.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.2.0
 [1.1.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.1.0
 [1.0.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.0.0
