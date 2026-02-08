@@ -1,6 +1,8 @@
 use pipelinex_core::analyzer;
 use pipelinex_core::optimizer::docker_opt;
 use pipelinex_core::optimizer::Optimizer;
+use pipelinex_core::parser::aws_codepipeline::AwsCodePipelineParser;
+use pipelinex_core::parser::azure::AzurePipelinesParser;
 use pipelinex_core::parser::bitbucket::BitbucketParser;
 use pipelinex_core::parser::circleci::CircleCIParser;
 use pipelinex_core::parser::github::GitHubActionsParser;
@@ -41,6 +43,14 @@ fn circleci_fixture(name: &str) -> PathBuf {
 
 fn bitbucket_fixture(name: &str) -> PathBuf {
     fixtures_dir().join("bitbucket").join(name)
+}
+
+fn azure_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("azure-pipelines").join(name)
+}
+
+fn aws_codepipeline_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("aws-codepipeline").join(name)
 }
 
 // ─── GitHub Actions integration tests ───
@@ -430,4 +440,56 @@ fn test_bitbucket_finds_optimizations() {
         report.potential_improvement_pct() > 50.0,
         "Should find significant optimizations"
     );
+}
+
+// ─── Azure Pipelines integration tests ───
+
+#[test]
+fn test_analyze_azure_pipeline() {
+    let path = azure_fixture("azure-stages-jobs.yml");
+    let dag = AzurePipelinesParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.provider, "azure-pipelines");
+    assert_eq!(report.job_count, 3);
+    assert!(report.max_parallelism >= 1);
+}
+
+#[test]
+fn test_azure_stage_and_job_dependencies() {
+    let path = azure_fixture("azure-stages-jobs.yml");
+    let dag = AzurePipelinesParser::parse_file(&path).unwrap();
+
+    let unit_tests = dag.get_job("test-unittests").unwrap();
+    assert!(unit_tests.needs.contains(&"build-buildapp".to_string()));
+
+    let deploy = dag.get_job("deploy-deployprod").unwrap();
+    assert!(deploy.needs.contains(&"test-unittests".to_string()));
+}
+
+// ─── AWS CodePipeline integration tests ───
+
+#[test]
+fn test_analyze_aws_codepipeline() {
+    let path = aws_codepipeline_fixture("codepipeline.json");
+    let dag = AwsCodePipelineParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.provider, "aws-codepipeline");
+    assert_eq!(report.job_count, 4);
+    assert!(report.findings.len() >= 1);
+}
+
+#[test]
+fn test_aws_codepipeline_action_dependencies() {
+    let path = aws_codepipeline_fixture("codepipeline.json");
+    let dag = AwsCodePipelineParser::parse_file(&path).unwrap();
+
+    let integration = dag.get_job("build-integrationtests").unwrap();
+    assert!(integration.needs.contains(&"build-lintandunit".to_string()));
+    assert!(integration.needs.contains(&"source-sourceaction".to_string()));
+
+    let deploy = dag.get_job("deploy-deploytoecs").unwrap();
+    assert!(deploy.needs.contains(&"build-lintandunit".to_string()));
+    assert!(deploy.needs.contains(&"build-integrationtests".to_string()));
 }

@@ -1,0 +1,48 @@
+name: Azure Multi-Stage CI
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - src/**
+      - tests/**
+
+variables:
+  NODE_ENV: production
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+
+stages:
+  - stage: Build
+    jobs:
+      - job: BuildApp
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - checkout: self
+          - script: npm ci
+          - template: templates/build-steps.yml
+          - script: npm run build
+
+  - stage: Test
+    dependsOn: Build
+    jobs:
+      - job: UnitTests
+        dependsOn: BuildApp
+        steps:
+          - task: Cache@2
+          - script: npm test
+
+  - stage: Deploy
+    dependsOn:
+      - Test
+    jobs:
+      - deployment: DeployProd
+        environment: production
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - template: templates/deploy-steps.yml
+                - script: ./deploy.sh
