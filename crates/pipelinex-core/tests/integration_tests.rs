@@ -4,6 +4,7 @@ use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::parser::aws_codepipeline::AwsCodePipelineParser;
 use pipelinex_core::parser::azure::AzurePipelinesParser;
 use pipelinex_core::parser::bitbucket::BitbucketParser;
+use pipelinex_core::parser::buildkite::BuildkiteParser;
 use pipelinex_core::parser::circleci::CircleCIParser;
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
@@ -51,6 +52,10 @@ fn azure_fixture(name: &str) -> PathBuf {
 
 fn aws_codepipeline_fixture(name: &str) -> PathBuf {
     fixtures_dir().join("aws-codepipeline").join(name)
+}
+
+fn buildkite_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("buildkite").join(name)
 }
 
 // ─── GitHub Actions integration tests ───
@@ -492,4 +497,32 @@ fn test_aws_codepipeline_action_dependencies() {
     let deploy = dag.get_job("deploy-deploytoecs").unwrap();
     assert!(deploy.needs.contains(&"build-lintandunit".to_string()));
     assert!(deploy.needs.contains(&"build-integrationtests".to_string()));
+}
+
+// ─── Buildkite integration tests ───
+
+#[test]
+fn test_analyze_buildkite_pipeline() {
+    let path = buildkite_fixture("pipeline.yml");
+    let dag = BuildkiteParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.provider, "buildkite");
+    assert_eq!(report.job_count, 4);
+    assert!(!report.findings.is_empty());
+}
+
+#[test]
+fn test_buildkite_dependency_chain() {
+    let path = buildkite_fixture("pipeline.yml");
+    let dag = BuildkiteParser::parse_file(&path).unwrap();
+
+    let lint = dag.get_job("lint").unwrap();
+    assert!(lint.needs.contains(&"install".to_string()));
+
+    let unit = dag.get_job("unit-tests").unwrap();
+    assert_eq!(unit.needs, vec!["lint"]);
+
+    let deploy = dag.get_job("deploy").unwrap();
+    assert_eq!(deploy.needs, vec!["unit-tests"]);
 }

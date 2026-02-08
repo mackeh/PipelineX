@@ -1,0 +1,33 @@
+env:
+  NODE_ENV: test
+
+steps:
+  - label: ":package: Install"
+    key: install
+    agents:
+      queue: linux-medium
+    commands:
+      - npm ci
+
+  - wait: ~
+
+  - label: ":lint-roller: Lint"
+    key: lint
+    command: npm run lint
+    artifact_paths:
+      - reports/lint/**
+
+  - label: ":test_tube: Unit Tests"
+    key: unit-tests
+    depends_on: lint
+    plugins:
+      - docker#v5.10.0:
+          image: node:20
+    commands:
+      - npm test
+
+  - label: ":rocket: Deploy"
+    key: deploy
+    depends_on:
+      - unit-tests
+    command: ./deploy.sh
