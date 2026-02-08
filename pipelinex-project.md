@@ -803,7 +803,7 @@ pipelinex/
 - [ ] Optimization impact tracking ("this change saved X min/month")
 - [x] Enterprise SSO, RBAC, audit logs
 - [x] Self-hosted deployment (Docker Compose + Helm chart)
-- [ ] REST API for custom integrations
+- [x] REST API for custom integrations
 - [ ] CI provider migration assistant ("convert GitHub Actions → GitLab CI")
 - [ ] Runner right-sizing recommendations (based on resource profiling)
 - [ ] Multi-repo pipeline analysis (monorepo orchestration detection)

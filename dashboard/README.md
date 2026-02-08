@@ -83,6 +83,11 @@ Query params:
 ### Public API (keyed)
 
 - `GET /api/public/v1/auth/me`
+- `GET /api/public/v1/openapi`
+- `GET /api/public/v1/workflows`
+- `POST /api/public/v1/analyze`
+- `GET /api/public/v1/history`
+- `POST /api/public/v1/history`
 - `GET /api/public/v1/audit/logs`
 - `GET /api/public/v1/benchmarks/stats`
 - `POST /api/public/v1/benchmarks/submit`
@@ -99,11 +104,18 @@ Role-aware key config is supported via:
 
 Built-in roles:
 
-- `admin`: `benchmarks:read`, `benchmarks:write`, `audit:read`
-- `analyst`: `benchmarks:read`, `audit:read`
-- `ingest`: `benchmarks:write`
-- `viewer`: `benchmarks:read`
+- `admin`: full access (`benchmarks`, `audit`, `workflows`, `analysis`, `history`)
+- `analyst`: `benchmarks:read`, `audit:read`, `workflows:read`, `analysis:run`, `history:read`
+- `ingest`: `benchmarks:write`, `analysis:run`, `history:write`
+- `viewer`: `benchmarks:read`, `workflows:read`, `history:read`
 - `auditor`: `audit:read`
+
+Custom integration scopes:
+
+- `workflows:read`
+- `analysis:run`
+- `history:read`
+- `history:write`
 
 `GET /api/public/v1/audit/logs` query params:
 

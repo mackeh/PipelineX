@@ -42,7 +42,7 @@ Add environment values to the `pipelinex-dashboard` service:
 ```yaml
 environment:
   PIPELINEX_API_KEY: "replace-me"
-  PIPELINEX_API_KEY_SCOPES: "benchmarks:read,benchmarks:write"
+  PIPELINEX_API_KEY_SCOPES: "benchmarks:read,benchmarks:write,workflows:read,analysis:run,history:read,history:write,audit:read"
   PIPELINEX_API_KEY_ROLES: "admin"
 ```
 
