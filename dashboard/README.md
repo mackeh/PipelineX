@@ -17,6 +17,12 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Self-hosted deploy
+
+- Docker Compose stack: `docker-compose.selfhost.yml` (from repo root)
+- Helm chart: `deploy/helm/pipelinex-dashboard`
+- Guide: `docs/SELF_HOSTING.md`
+
 ## API endpoints
 
 ### `GET /api/workflows`
