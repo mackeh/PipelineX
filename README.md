@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/mackeh/PipelineX/actions/workflows/ci.yml/badge.svg)](https://github.com/mackeh/PipelineX/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platforms](https://img.shields.io/badge/platforms-7%20CI%20systems-success)](#supported-ci-platforms)
+[![Platforms](https://img.shields.io/badge/platforms-8%20CI%20systems-success)](#supported-ci-platforms)
 
 [Features](#-features) •
 [Quick Start](#-quick-start) •
@@ -43,7 +43,7 @@ Most of that time is wasted on:
 
 ### 🔍 **Multi-Platform Analysis**
 
-Supports 7 major CI systems:
+Supports 8 major CI systems:
 
 - GitHub Actions
 - GitLab CI
@@ -52,6 +52,7 @@ Supports 7 major CI systems:
 - Bitbucket Pipelines
 - Azure Pipelines
 - AWS CodePipeline
+- Buildkite
 
 Analyzes YAML/Groovy configs offline — no account or API needed.
 
@@ -561,6 +562,7 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 | **Bitbucket Pipelines** | ✅ Fully Supported | Pipelines, parallel, deployments, services                 |
 | **Azure Pipelines**     | ✅ Fully Supported | Stages, jobs, dependencies, templates                      |
 | **AWS CodePipeline**    | ✅ Fully Supported | Stages, actions, runOrder, artifacts                       |
+| **Buildkite**           | ✅ Fully Supported | Steps, depends_on, wait/block barriers, plugins, artifacts |
 | Drone CI                | 🔜 Planned         | Steps, services, volumes                                   |
 | Travis CI               | 🔜 Planned         | Stages, jobs, matrix                                       |
 

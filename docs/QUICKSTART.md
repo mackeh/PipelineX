@@ -61,6 +61,9 @@ pipelinex analyze azure-pipelines.yml
 
 # AWS CodePipeline
 pipelinex analyze codepipeline.json
+
+# Buildkite
+pipelinex analyze .buildkite/pipeline.yml
 ```
 
 **Example output:**
