@@ -8,7 +8,14 @@ import {
   isEnterpriseSessionAuthEnabled,
 } from "@/lib/enterprise-auth";
 
-export type PublicApiScope = "benchmarks:read" | "benchmarks:write" | "audit:read";
+export type PublicApiScope =
+  | "benchmarks:read"
+  | "benchmarks:write"
+  | "audit:read"
+  | "workflows:read"
+  | "analysis:run"
+  | "history:read"
+  | "history:write";
 
 export type PublicApiRole = "admin" | "analyst" | "ingest" | "viewer" | "auditor";
 
@@ -99,10 +106,24 @@ const RATE_LIMIT_STORE_RELATIVE_PATH = ".pipelinex/public-api-rate-limits.json";
 const AUDIT_LOG_RELATIVE_PATH = ".pipelinex/public-api-audit.log";
 
 const ROLE_SCOPES: Record<PublicApiRole, PublicApiScope[]> = {
-  admin: ["benchmarks:read", "benchmarks:write", "audit:read"],
-  analyst: ["benchmarks:read", "audit:read"],
-  ingest: ["benchmarks:write"],
-  viewer: ["benchmarks:read"],
+  admin: [
+    "benchmarks:read",
+    "benchmarks:write",
+    "audit:read",
+    "workflows:read",
+    "analysis:run",
+    "history:read",
+    "history:write",
+  ],
+  analyst: [
+    "benchmarks:read",
+    "audit:read",
+    "workflows:read",
+    "analysis:run",
+    "history:read",
+  ],
+  ingest: ["benchmarks:write", "analysis:run", "history:write"],
+  viewer: ["benchmarks:read", "workflows:read", "history:read"],
   auditor: ["audit:read"],
 };
 
@@ -144,7 +165,15 @@ function normalizeScopes(rawScopes: unknown): PublicApiScope[] {
     return [];
   }
 
-  const allowed: PublicApiScope[] = ["benchmarks:read", "benchmarks:write", "audit:read"];
+  const allowed: PublicApiScope[] = [
+    "benchmarks:read",
+    "benchmarks:write",
+    "audit:read",
+    "workflows:read",
+    "analysis:run",
+    "history:read",
+    "history:write",
+  ];
   return rawScopes.filter((scope): scope is PublicApiScope =>
     typeof scope === "string" ? allowed.includes(scope as PublicApiScope) : false,
   );
@@ -369,7 +398,14 @@ async function parseConfiguredApiKeys(): Promise<ApiKeyConfig[]> {
       scopes: mergeScopesWithRoles(
         directScopes,
         directRoles,
-        ["benchmarks:read", "benchmarks:write"],
+        [
+          "benchmarks:read",
+          "benchmarks:write",
+          "workflows:read",
+          "analysis:run",
+          "history:read",
+          "history:write",
+        ],
       ),
       roles: directRoles,
       rateLimitPerMinute: defaultLimit,

@@ -1,6 +1,13 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
-export type EnterpriseScope = "benchmarks:read" | "benchmarks:write" | "audit:read";
+export type EnterpriseScope =
+  | "benchmarks:read"
+  | "benchmarks:write"
+  | "audit:read"
+  | "workflows:read"
+  | "analysis:run"
+  | "history:read"
+  | "history:write";
 
 export type EnterpriseRole = "admin" | "analyst" | "ingest" | "viewer" | "auditor";
 
@@ -61,10 +68,24 @@ const MIN_SESSION_TTL_SECONDS = 60;
 const CLOCK_SKEW_MS = 5 * 60_000;
 
 const ROLE_SCOPES: Record<EnterpriseRole, EnterpriseScope[]> = {
-  admin: ["benchmarks:read", "benchmarks:write", "audit:read"],
-  analyst: ["benchmarks:read", "audit:read"],
-  ingest: ["benchmarks:write"],
-  viewer: ["benchmarks:read"],
+  admin: [
+    "benchmarks:read",
+    "benchmarks:write",
+    "audit:read",
+    "workflows:read",
+    "analysis:run",
+    "history:read",
+    "history:write",
+  ],
+  analyst: [
+    "benchmarks:read",
+    "audit:read",
+    "workflows:read",
+    "analysis:run",
+    "history:read",
+  ],
+  ingest: ["benchmarks:write", "analysis:run", "history:write"],
+  viewer: ["benchmarks:read", "workflows:read", "history:read"],
   auditor: ["audit:read"],
 };
 
@@ -114,7 +135,15 @@ function normalizeScopes(rawScopes: unknown): EnterpriseScope[] {
     return [];
   }
 
-  const allowed: EnterpriseScope[] = ["benchmarks:read", "benchmarks:write", "audit:read"];
+  const allowed: EnterpriseScope[] = [
+    "benchmarks:read",
+    "benchmarks:write",
+    "audit:read",
+    "workflows:read",
+    "analysis:run",
+    "history:read",
+    "history:write",
+  ];
   return rawScopes.filter((scope): scope is EnterpriseScope =>
     typeof scope === "string" ? allowed.includes(scope as EnterpriseScope) : false,
   );
