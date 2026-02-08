@@ -195,6 +195,16 @@ Upload to GitHub Security tab for inline PR annotations.
 - PipelineX: Generate HTML Report
 - PipelineX: Run Simulation
 
+**Inline hints extension (local):**
+
+```bash
+cd vscode-extension
+npm install
+npm run build
+```
+
+Then open `vscode-extension/` in VS Code and press `F5` to launch the Extension Development Host.
+
 ### Command Line with Make
 
 ```bash

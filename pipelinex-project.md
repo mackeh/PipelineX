@@ -798,7 +798,7 @@ pipelinex/
 **Goal:** Enterprise features, community benchmarks, broad CI support.
 
 - [ ] Azure Pipelines + AWS CodePipeline + Buildkite parsers
-- [ ] VS Code extension with inline workflow optimization hints
+- [x] VS Code extension with inline workflow optimization hints
 - [ ] Community benchmark registry (anonymized — "your pipeline vs. similar projects")
 - [ ] Optimization impact tracking ("this change saved X min/month")
 - [x] Enterprise SSO, RBAC, audit logs

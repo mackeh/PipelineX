@@ -175,6 +175,7 @@ Pre-configured tasks and hooks included — just run `make help` or see [QUICKST
 📚 **[Full Integration Guide](docs/INTEGRATIONS.md)** | **[Quick Start Guide](docs/QUICKSTART.md)** | **[Examples](examples/integrations/)**
 📦 **Self-hosted:** [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md)
 🔌 **REST API:** [docs/REST_API.md](docs/REST_API.md)
+🧩 **VS Code Extension:** [docs/VS_CODE_EXTENSION.md](docs/VS_CODE_EXTENSION.md)
 
 ---
 
@@ -683,6 +684,14 @@ pipelinex:
 }
 ```
 
+For inline optimization hints in workflow files, use the local extension in `vscode-extension/`:
+
+```bash
+cd vscode-extension
+npm install
+npm run build
+```
+
 **Pre-commit Hook:**
 
 ```bash
@@ -787,6 +796,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) - Integration patterns
 - [docs/REST_API.md](docs/REST_API.md) - Public REST API for custom integrations
 - [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) - Docker Compose and Helm deployment
+- [docs/VS_CODE_EXTENSION.md](docs/VS_CODE_EXTENSION.md) - Inline workflow hints in VS Code
 - [docs/PLUGINS.md](docs/PLUGINS.md) - External plugin manifest and protocol
 - [.github/workflow-templates/](.github/workflow-templates/) - GitHub Actions templates
 - [tests/fixtures/](tests/fixtures/) - Example pipelines
@@ -798,7 +808,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - **Phase 1:** ✅ Core engine, GitHub Actions parser, CLI
 - **Phase 2:** ✅ Multi-platform (5 CI systems), simulation, visualization
 - **Phase 3:** 🚧 Platform features in progress (live dashboard + API endpoints started)
-- **Phase 4:** 🚧 In progress (benchmarks, public API hardening, enterprise auth, self-hosted deploy, REST API, plugin scaffold)
+- **Phase 4:** 🚧 In progress (benchmarks, public API hardening, enterprise auth, self-hosted deploy, REST API, VS Code extension, plugin scaffold)
 
 ---
 
