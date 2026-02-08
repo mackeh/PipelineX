@@ -18,6 +18,7 @@ export async function GET(request: Request) {
     NextResponse.json({
       id: auth.principal.id,
       scopes: auth.principal.scopes,
+      roles: auth.principal.roles,
     }),
     "Principal metadata returned.",
   );

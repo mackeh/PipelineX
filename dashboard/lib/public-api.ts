@@ -4,12 +4,15 @@ import { appendFile, access, mkdir, readFile, writeFile } from "node:fs/promises
 import path from "node:path";
 import { NextResponse } from "next/server";
 
-export type PublicApiScope = "benchmarks:read" | "benchmarks:write";
+export type PublicApiScope = "benchmarks:read" | "benchmarks:write" | "audit:read";
+
+export type PublicApiRole = "admin" | "analyst" | "ingest" | "viewer" | "auditor";
 
 interface ApiKeyConfig {
   id: string;
   key: string;
   scopes: PublicApiScope[];
+  roles: PublicApiRole[];
   rateLimitPerMinute: number;
   description?: string;
   notBefore?: string;
@@ -28,6 +31,7 @@ type AuthSuccess = {
   principal: {
     id: string;
     scopes: PublicApiScope[];
+    roles: PublicApiRole[];
   };
   rateLimit: RateLimitState;
   requiredScope: PublicApiScope;
@@ -54,7 +58,7 @@ interface RateLimitStore {
   buckets: Record<string, RateBucket>;
 }
 
-interface PublicApiAuditRecord {
+export interface PublicApiAuditRecord {
   timestamp: string;
   requestId: string;
   keyId: string;
@@ -72,10 +76,31 @@ interface PublicApiAuditRecord {
   };
 }
 
+export interface PublicApiAuditQuery {
+  keyId?: string;
+  scope?: string;
+  method?: string;
+  pathContains?: string;
+  status?: number;
+  since?: string;
+  until?: string;
+  limit?: number;
+}
+
 const WINDOW_MS = 60_000;
 const DEFAULT_RATE_LIMIT = 60;
+const DEFAULT_AUDIT_QUERY_LIMIT = 100;
+const MAX_AUDIT_QUERY_LIMIT = 1000;
 const RATE_LIMIT_STORE_RELATIVE_PATH = ".pipelinex/public-api-rate-limits.json";
 const AUDIT_LOG_RELATIVE_PATH = ".pipelinex/public-api-audit.log";
+
+const ROLE_SCOPES: Record<PublicApiRole, PublicApiScope[]> = {
+  admin: ["benchmarks:read", "benchmarks:write", "audit:read"],
+  analyst: ["benchmarks:read", "audit:read"],
+  ingest: ["benchmarks:write"],
+  viewer: ["benchmarks:read"],
+  auditor: ["audit:read"],
+};
 
 type LockFn<T> = () => Promise<T>;
 let rateLimitLock: Promise<void> = Promise.resolve();
@@ -102,12 +127,20 @@ function parseRateLimit(rawValue: string | undefined, fallback: number): number 
   return parsed;
 }
 
+function dedupeScopes(scopes: PublicApiScope[]): PublicApiScope[] {
+  return [...new Set(scopes)];
+}
+
+function dedupeRoles(roles: PublicApiRole[]): PublicApiRole[] {
+  return [...new Set(roles)];
+}
+
 function normalizeScopes(rawScopes: unknown): PublicApiScope[] {
   if (!Array.isArray(rawScopes)) {
     return [];
   }
 
-  const allowed: PublicApiScope[] = ["benchmarks:read", "benchmarks:write"];
+  const allowed: PublicApiScope[] = ["benchmarks:read", "benchmarks:write", "audit:read"];
   return rawScopes.filter((scope): scope is PublicApiScope =>
     typeof scope === "string" ? allowed.includes(scope as PublicApiScope) : false,
   );
@@ -123,6 +156,46 @@ function normalizeScopeList(raw: string | undefined): PublicApiScope[] {
       .map((value) => value.trim())
       .filter((value) => value.length > 0),
   );
+}
+
+function normalizeRoles(rawRoles: unknown): PublicApiRole[] {
+  if (!Array.isArray(rawRoles)) {
+    return [];
+  }
+
+  const allowed: PublicApiRole[] = ["admin", "analyst", "ingest", "viewer", "auditor"];
+  return rawRoles.filter((role): role is PublicApiRole =>
+    typeof role === "string" ? allowed.includes(role as PublicApiRole) : false,
+  );
+}
+
+function normalizeRoleList(raw: string | undefined): PublicApiRole[] {
+  if (!raw) {
+    return [];
+  }
+  return normalizeRoles(
+    raw
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0),
+  );
+}
+
+function scopesForRoles(roles: PublicApiRole[]): PublicApiScope[] {
+  const scopes: PublicApiScope[] = [];
+  for (const role of roles) {
+    scopes.push(...ROLE_SCOPES[role]);
+  }
+  return dedupeScopes(scopes);
+}
+
+function mergeScopesWithRoles(
+  scopes: PublicApiScope[],
+  roles: PublicApiRole[],
+  fallbackScopes: PublicApiScope[],
+): PublicApiScope[] {
+  const merged = dedupeScopes([...scopes, ...scopesForRoles(roles)]);
+  return merged.length > 0 ? merged : fallbackScopes;
 }
 
 function parseIsoTimestamp(value: unknown): string | undefined {
@@ -231,6 +304,7 @@ function normalizeApiKeyRecords(records: unknown[], source: string): ApiKeyConfi
       id?: unknown;
       key?: unknown;
       scopes?: unknown;
+      roles?: unknown;
       rateLimitPerMinute?: unknown;
       description?: unknown;
       notBefore?: unknown;
@@ -248,7 +322,9 @@ function normalizeApiKeyRecords(records: unknown[], source: string): ApiKeyConfi
         ? record.id.trim()
         : `${source}-key-${normalized.length + 1}`;
 
-    const scopes = normalizeScopes(record.scopes);
+    const roles = dedupeRoles(normalizeRoles(record.roles));
+    const explicitScopes = normalizeScopes(record.scopes);
+    const scopes = mergeScopesWithRoles(explicitScopes, roles, ["benchmarks:read"]);
     const rateLimitPerMinute =
       typeof record.rateLimitPerMinute === "number"
         ? parseRateLimit(String(record.rateLimitPerMinute), DEFAULT_RATE_LIMIT)
@@ -257,7 +333,8 @@ function normalizeApiKeyRecords(records: unknown[], source: string): ApiKeyConfi
     normalized.push({
       id,
       key,
-      scopes: scopes.length > 0 ? scopes : ["benchmarks:read"],
+      scopes,
+      roles,
       rateLimitPerMinute,
       description:
         typeof record.description === "string" ? record.description.trim() : undefined,
@@ -278,14 +355,19 @@ async function parseConfiguredApiKeys(): Promise<ApiKeyConfig[]> {
   const configured: ApiKeyConfig[] = [];
 
   const directKey = process.env.PIPELINEX_API_KEY?.trim();
-  const directScopes =
-    normalizeScopeList(process.env.PIPELINEX_API_KEY_SCOPES) || [];
+  const directRoles = dedupeRoles(normalizeRoleList(process.env.PIPELINEX_API_KEY_ROLES));
+  const directScopes = normalizeScopeList(process.env.PIPELINEX_API_KEY_SCOPES);
 
   if (directKey) {
     configured.push({
       id: process.env.PIPELINEX_API_KEY_ID?.trim() || "default",
       key: directKey,
-      scopes: directScopes.length > 0 ? directScopes : ["benchmarks:read", "benchmarks:write"],
+      scopes: mergeScopesWithRoles(
+        directScopes,
+        directRoles,
+        ["benchmarks:read", "benchmarks:write"],
+      ),
+      roles: directRoles,
       rateLimitPerMinute: defaultLimit,
       notBefore: parseIsoTimestamp(process.env.PIPELINEX_API_KEY_NOT_BEFORE),
       expiresAt: parseIsoTimestamp(process.env.PIPELINEX_API_KEY_EXPIRES_AT),
@@ -314,6 +396,8 @@ async function parseConfiguredApiKeys(): Promise<ApiKeyConfig[]> {
     .map((key) => ({
       ...key,
       rateLimitPerMinute: parseRateLimit(String(key.rateLimitPerMinute), defaultLimit),
+      scopes: dedupeScopes(key.scopes),
+      roles: dedupeRoles(key.roles),
     }))
     .filter((key) => keyIsActive(key, nowMs));
 }
@@ -598,6 +682,7 @@ export async function authenticatePublicApiRequest(
     principal: {
       id: matched.id,
       scopes: matched.scopes,
+      roles: matched.roles,
     },
     requiredScope,
     rateLimit,
@@ -628,4 +713,115 @@ export async function finalizePublicApiResponse(
     rateLimit: auth.rateLimit,
   });
   return response;
+}
+
+export async function queryPublicApiAuditLogs(
+  query: PublicApiAuditQuery,
+): Promise<PublicApiAuditRecord[]> {
+  const auditPath = await resolveStorePath(
+    "PIPELINEX_PUBLIC_API_AUDIT_LOG_FILE",
+    AUDIT_LOG_RELATIVE_PATH,
+  );
+
+  if (!(await pathExists(auditPath))) {
+    return [];
+  }
+
+  const requestedLimit =
+    typeof query.limit === "number" && Number.isFinite(query.limit)
+      ? Math.floor(query.limit)
+      : DEFAULT_AUDIT_QUERY_LIMIT;
+  const limit = Math.min(Math.max(requestedLimit, 1), MAX_AUDIT_QUERY_LIMIT);
+
+  const sinceMs = query.since ? Date.parse(query.since) : Number.NaN;
+  const untilMs = query.until ? Date.parse(query.until) : Number.NaN;
+
+  const content = await readFile(auditPath, "utf8");
+  const lines = content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const filtered: PublicApiAuditRecord[] = [];
+
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(lines[index]);
+    } catch {
+      continue;
+    }
+
+    if (!parsed || typeof parsed !== "object") {
+      continue;
+    }
+
+    const record = parsed as Partial<PublicApiAuditRecord>;
+    if (
+      typeof record.timestamp !== "string" ||
+      typeof record.requestId !== "string" ||
+      typeof record.keyId !== "string" ||
+      typeof record.scope !== "string" ||
+      typeof record.method !== "string" ||
+      typeof record.path !== "string" ||
+      typeof record.status !== "number" ||
+      typeof record.clientIp !== "string" ||
+      typeof record.userAgent !== "string"
+    ) {
+      continue;
+    }
+
+    const ts = Date.parse(record.timestamp);
+    if (query.keyId && record.keyId !== query.keyId) {
+      continue;
+    }
+    if (query.scope && record.scope !== query.scope) {
+      continue;
+    }
+    if (query.method && record.method.toUpperCase() !== query.method.toUpperCase()) {
+      continue;
+    }
+    if (query.pathContains && !record.path.includes(query.pathContains)) {
+      continue;
+    }
+    if (typeof query.status === "number" && record.status !== query.status) {
+      continue;
+    }
+    if (Number.isFinite(sinceMs) && Number.isFinite(ts) && ts < sinceMs) {
+      continue;
+    }
+    if (Number.isFinite(untilMs) && Number.isFinite(ts) && ts > untilMs) {
+      continue;
+    }
+
+    filtered.push({
+      timestamp: record.timestamp,
+      requestId: record.requestId,
+      keyId: record.keyId,
+      scope: record.scope,
+      method: record.method,
+      path: record.path,
+      status: record.status,
+      clientIp: record.clientIp,
+      userAgent: record.userAgent,
+      message: typeof record.message === "string" ? record.message : undefined,
+      rateLimit:
+        record.rateLimit &&
+        typeof record.rateLimit.limit === "number" &&
+        typeof record.rateLimit.remaining === "number" &&
+        typeof record.rateLimit.resetEpochSeconds === "number"
+          ? {
+              limit: record.rateLimit.limit,
+              remaining: record.rateLimit.remaining,
+              resetEpochSeconds: record.rateLimit.resetEpochSeconds,
+            }
+          : undefined,
+    });
+
+    if (filtered.length >= limit) {
+      break;
+    }
+  }
+
+  return filtered;
 }
