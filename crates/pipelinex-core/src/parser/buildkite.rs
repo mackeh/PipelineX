@@ -133,8 +133,7 @@ fn parse_step(step: &Value, step_idx: usize, synthetic_idx: &mut usize) -> Resul
     let id = sanitize_id(&key);
     let mut job = JobNode::new(id.clone(), label.clone());
 
-    job.runs_on = parse_agents(step.get("agents"))
-        .unwrap_or_else(|| "buildkite:agent".to_string());
+    job.runs_on = parse_agents(step.get("agents")).unwrap_or_else(|| "buildkite:agent".to_string());
     job.condition = step.get("if").and_then(|v| v.as_str()).map(String::from);
     job.env = parse_env(step.get("env"));
 
@@ -201,9 +200,7 @@ fn is_wait_or_block(step: &Value) -> bool {
 }
 
 fn parse_agents(agents: Option<&Value>) -> Option<String> {
-    let Some(agents) = agents else {
-        return None;
-    };
+    let agents = agents?;
 
     if let Some(s) = agents.as_str() {
         return Some(format!("buildkite:{s}"));

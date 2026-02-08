@@ -264,7 +264,10 @@ impl AzurePipelinesParser {
             });
             job.estimated_duration_secs = 5.0;
             dag.add_job(job);
-            job_aliases.insert(format!("{}.template{}", stage_name, job_idx + 1), id.clone());
+            job_aliases.insert(
+                format!("{}.template{}", stage_name, job_idx + 1),
+                id.clone(),
+            );
             return Ok(ParsedJob {
                 id,
                 depends_on_raw: Vec::new(),
@@ -283,8 +286,8 @@ impl AzurePipelinesParser {
         let id = format!("{}-{}", sanitize_id(stage_name), sanitize_id(&raw_name));
         let mut job = JobNode::new(id.clone(), raw_name.clone());
 
-        job.runs_on = parse_pool_name(job_value.get("pool"))
-            .unwrap_or_else(|| "azure:vm".to_string());
+        job.runs_on =
+            parse_pool_name(job_value.get("pool")).unwrap_or_else(|| "azure:vm".to_string());
         job.condition = job_value
             .get("condition")
             .and_then(|v| v.as_str())
@@ -302,10 +305,7 @@ impl AzurePipelinesParser {
         dag.add_job(job);
 
         job_aliases.insert(raw_name.clone(), id.clone());
-        job_aliases.insert(
-            format!("{}.{}", stage_name, raw_name),
-            id.clone(),
-        );
+        job_aliases.insert(format!("{}.{}", stage_name, raw_name), id.clone());
 
         Ok(ParsedJob {
             id,

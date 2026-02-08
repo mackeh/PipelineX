@@ -25,7 +25,8 @@ impl AwsCodePipelineParser {
     ///
     /// Note: We use `serde_yaml::Value` intentionally because YAML parser can also decode JSON.
     pub fn parse(content: &str, source_file: String) -> Result<PipelineDag> {
-        let parsed: Value = serde_yaml::from_str(content).context("Failed to parse pipeline data")?;
+        let parsed: Value =
+            serde_yaml::from_str(content).context("Failed to parse pipeline data")?;
         let pipeline = parsed.get("pipeline").unwrap_or(&parsed);
 
         let name = pipeline
@@ -64,11 +65,8 @@ impl AwsCodePipelineParser {
                     .and_then(|v| v.as_str())
                     .unwrap_or("action")
                     .to_string();
-                let action_id = format!(
-                    "{}-{}",
-                    sanitize_id(&stage_name),
-                    sanitize_id(&action_name)
-                );
+                let action_id =
+                    format!("{}-{}", sanitize_id(&stage_name), sanitize_id(&action_name));
 
                 let run_order = action_value
                     .get("runOrder")
@@ -91,7 +89,10 @@ impl AwsCodePipelineParser {
             }
 
             let _ = stage_idx;
-            stage_actions.push(StageActions { all_ids, run_order_groups });
+            stage_actions.push(StageActions {
+                all_ids,
+                run_order_groups,
+            });
         }
 
         // Dependencies:
@@ -169,9 +170,12 @@ impl AwsCodePipelineParser {
 
         let mut job = JobNode::new(id.to_string(), action_name.to_string());
         job.runs_on = format!("aws:{}:{}", category.to_lowercase(), provider);
-        job.env.insert("__stage".to_string(), stage_name.to_string());
-        job.env.insert("__category".to_string(), category.to_string());
-        job.env.insert("__provider".to_string(), provider.to_string());
+        job.env
+            .insert("__stage".to_string(), stage_name.to_string());
+        job.env
+            .insert("__category".to_string(), category.to_string());
+        job.env
+            .insert("__provider".to_string(), provider.to_string());
         job.env.insert("__owner".to_string(), owner.to_string());
         job.env
             .insert("__action_index".to_string(), (action_idx + 1).to_string());
@@ -375,11 +379,9 @@ pipeline:
         let dag = AwsCodePipelineParser::parse(config, "codepipeline.yml".to_string()).unwrap();
         let source = dag.get_job("source-fetch").unwrap();
         assert!(source.runs_on.to_lowercase().contains("aws:source:s3"));
-        assert!(
-            source
-                .env
-                .get("output_artifacts")
-                .is_some_and(|v| v.contains("Src"))
-        );
+        assert!(source
+            .env
+            .get("output_artifacts")
+            .is_some_and(|v| v.contains("Src")));
     }
 }

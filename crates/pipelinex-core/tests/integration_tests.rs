@@ -482,7 +482,7 @@ fn test_analyze_aws_codepipeline() {
 
     assert_eq!(report.provider, "aws-codepipeline");
     assert_eq!(report.job_count, 4);
-    assert!(report.findings.len() >= 1);
+    assert!(!report.findings.is_empty());
 }
 
 #[test]
@@ -492,7 +492,9 @@ fn test_aws_codepipeline_action_dependencies() {
 
     let integration = dag.get_job("build-integrationtests").unwrap();
     assert!(integration.needs.contains(&"build-lintandunit".to_string()));
-    assert!(integration.needs.contains(&"source-sourceaction".to_string()));
+    assert!(integration
+        .needs
+        .contains(&"source-sourceaction".to_string()));
 
     let deploy = dag.get_job("deploy-deploytoecs").unwrap();
     assert!(deploy.needs.contains(&"build-lintandunit".to_string()));

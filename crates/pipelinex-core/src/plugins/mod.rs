@@ -120,11 +120,19 @@ pub fn load_manifest_from_env() -> anyhow::Result<Option<PluginManifest>> {
 /// Load plugin manifest from a path.
 pub fn load_manifest_from_path(path: PathBuf) -> anyhow::Result<PluginManifest> {
     let content = std::fs::read_to_string(&path).map_err(|error| {
-        anyhow::anyhow!("Failed to read plugin manifest '{}': {}", path.display(), error)
+        anyhow::anyhow!(
+            "Failed to read plugin manifest '{}': {}",
+            path.display(),
+            error
+        )
     })?;
 
     let manifest: PluginManifest = serde_json::from_str(&content).map_err(|error| {
-        anyhow::anyhow!("Invalid plugin manifest JSON '{}': {}", path.display(), error)
+        anyhow::anyhow!(
+            "Invalid plugin manifest JSON '{}': {}",
+            path.display(),
+            error
+        )
     })?;
 
     Ok(manifest)
@@ -215,9 +223,12 @@ fn run_single_analyzer_plugin(
         .map_err(|error| format!("Failed to spawn plugin '{}': {}", plugin.id, error))?;
 
     if let Some(stdin) = child.stdin.as_mut() {
-        stdin
-            .write_all(input_json.as_bytes())
-            .map_err(|error| format!("Failed to write stdin for plugin '{}': {}", plugin.id, error))?;
+        stdin.write_all(input_json.as_bytes()).map_err(|error| {
+            format!(
+                "Failed to write stdin for plugin '{}': {}",
+                plugin.id, error
+            )
+        })?;
     }
 
     let output = child
@@ -240,7 +251,10 @@ fn run_single_analyzer_plugin(
     parse_plugin_output(plugin, &stdout)
 }
 
-fn parse_plugin_output(plugin: &ExternalAnalyzerPlugin, stdout: &str) -> Result<Vec<Finding>, String> {
+fn parse_plugin_output(
+    plugin: &ExternalAnalyzerPlugin,
+    stdout: &str,
+) -> Result<Vec<Finding>, String> {
     let trimmed = stdout.trim();
     if trimmed.is_empty() {
         return Ok(Vec::new());
@@ -250,12 +264,13 @@ fn parse_plugin_output(plugin: &ExternalAnalyzerPlugin, stdout: &str) -> Result<
     let parsed_findings = match parsed_as_array {
         Ok(findings) => findings,
         Err(_) => {
-            let envelope: PluginResultEnvelope = serde_json::from_str(trimmed).map_err(|error| {
-                format!(
-                    "Plugin '{}' returned invalid JSON output: {}",
-                    plugin.id, error
-                )
-            })?;
+            let envelope: PluginResultEnvelope =
+                serde_json::from_str(trimmed).map_err(|error| {
+                    format!(
+                        "Plugin '{}' returned invalid JSON output: {}",
+                        plugin.id, error
+                    )
+                })?;
             envelope.findings
         }
     };
@@ -267,7 +282,13 @@ fn parse_plugin_output(plugin: &ExternalAnalyzerPlugin, stdout: &str) -> Result<
 }
 
 fn plugin_finding_to_core(plugin: &ExternalAnalyzerPlugin, finding: PluginFinding) -> Finding {
-    let category = match finding.category.as_deref().unwrap_or("").to_lowercase().as_str() {
+    let category = match finding
+        .category
+        .as_deref()
+        .unwrap_or("")
+        .to_lowercase()
+        .as_str()
+    {
         "criticalpath" | "critical_path" => FindingCategory::CriticalPath,
         "missingcache" | "missing_cache" => FindingCategory::MissingCache,
         "serialbottleneck" | "serial_bottleneck" => FindingCategory::SerialBottleneck,
