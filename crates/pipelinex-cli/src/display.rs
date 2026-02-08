@@ -644,3 +644,126 @@ pub fn print_flaky_report(report: &FlakyReport, files: &[PathBuf]) {
     );
     println!();
 }
+
+use pipelinex_core::providers::github_api::PipelineStatistics;
+
+pub fn print_history_stats(stats: &PipelineStatistics) {
+    use colored::Colorize;
+
+    println!("{}", "━".repeat(70).bright_black());
+    println!("{}", format!("📊 Pipeline History: {}", stats.workflow_name).bold().cyan());
+    println!("{}", "━".repeat(70).bright_black());
+    println!();
+
+    // Overall statistics
+    println!("{}", " Overall Statistics".bold());
+    println!("   Total runs analyzed:  {}", stats.total_runs.to_string().yellow());
+    println!("   Success rate:         {:.1}%", (stats.success_rate * 100.0).to_string().green());
+    println!();
+
+    // Duration statistics
+    println!("{}", " Duration Statistics".bold());
+    println!("   Average:   {}", format_duration(stats.avg_duration_sec).yellow());
+    println!("   Median:    {}", format_duration(stats.p50_duration_sec).yellow());
+    println!("   P90:       {}", format_duration(stats.p90_duration_sec).yellow());
+    println!("   P99:       {}", format_duration(stats.p99_duration_sec).yellow());
+    println!();
+
+    // Job-level statistics
+    if !stats.job_timings.is_empty() {
+        println!("{}", " Job Performance".bold());
+        println!();
+
+        let mut jobs = stats.job_timings.clone();
+        jobs.sort_by(|a, b| b.avg_duration_sec.partial_cmp(&a.avg_duration_sec).unwrap());
+
+        for job in jobs.iter().take(10) {
+            let total_runs = job.success_count + job.failure_count;
+            let success_rate = if total_runs > 0 {
+                job.success_count as f64 / total_runs as f64 * 100.0
+            } else {
+                0.0
+            };
+
+            let job_label = if job.failure_count > 0 && job.success_count > 0 {
+                format!("🟡 {}", job.job_name).yellow()
+            } else if job.failure_count > 0 {
+                format!("🔴 {}", job.job_name).red()
+            } else {
+                format!("✅ {}", job.job_name).green()
+            };
+
+            println!("   {}", job_label);
+            println!("      Average: {} | P50: {} | P90: {}",
+                format_duration(job.avg_duration_sec).bright_white(),
+                format_duration(job.p50_duration_sec).bright_black(),
+                format_duration(job.p90_duration_sec).bright_black()
+            );
+            println!("      Runs: {} | Success rate: {:.1}%",
+                total_runs.to_string().bright_black(),
+                format!("{:.1}", success_rate)
+            );
+
+            // Show variance indicator
+            if job.variance > 4.0 {
+                println!("      ⚠️  {} (high variance detected)",
+                    "Unstable timing".yellow()
+                );
+            }
+            println!();
+        }
+    }
+
+    // Flaky jobs
+    if !stats.flaky_jobs.is_empty() {
+        println!("{}", " ⚠️  Potentially Flaky Jobs".bold().yellow());
+        for flaky_job in &stats.flaky_jobs {
+            println!("   • {}", flaky_job.red());
+        }
+        println!();
+    }
+
+    println!("{}", "━".repeat(70).bright_black());
+    println!("{}", " 💡 Insights".bold().cyan());
+    println!("{}", "━".repeat(70).bright_black());
+    println!();
+
+    // Provide insights
+    if stats.p90_duration_sec > stats.avg_duration_sec * 1.5 {
+        println!("   {} P90 is significantly higher than average",
+            "🔴".red()
+        );
+        println!("      This indicates high variance in pipeline duration.");
+        println!("      Consider investigating slow runs for bottlenecks.");
+        println!();
+    }
+
+    if stats.success_rate < 0.9 {
+        println!("   {} Success rate below 90%",
+            "🔴".red()
+        );
+        println!("      {} of runs fail. Identify and fix flaky tests or unstable jobs.",
+            format!("{:.0}%", (1.0 - stats.success_rate) * 100.0)
+        );
+        println!();
+    }
+
+    if !stats.flaky_jobs.is_empty() {
+        println!("   {} {} potentially flaky jobs detected",
+            "🟡".yellow(),
+            stats.flaky_jobs.len()
+        );
+        println!("      Run 'pipelinex flaky' with JUnit reports to analyze test-level flakiness.");
+        println!();
+    }
+
+    println!("{}", "━".repeat(70).bright_black());
+    println!();
+    println!("{}", " Use this data to:".bright_white());
+    println!("   • Identify the slowest jobs for optimization");
+    println!("   • Spot flaky or unstable jobs");
+    println!("   • Track performance trends over time");
+    println!("   • Validate that optimizations reduced duration");
+    println!();
+}
+

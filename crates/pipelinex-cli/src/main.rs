@@ -11,6 +11,7 @@ use pipelinex_core::analyzer;
 use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::test_selector::TestSelector;
 use pipelinex_core::flaky_detector::FlakyDetector;
+use pipelinex_core::providers::GitHubClient;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -160,9 +161,33 @@ enum Commands {
         #[arg(short, long, default_value = "text")]
         format: String,
     },
+
+    /// Fetch and analyze workflow run history from GitHub
+    History {
+        /// Repository (format: owner/repo, e.g., "microsoft/vscode")
+        #[arg(short, long)]
+        repo: String,
+
+        /// Workflow file name (e.g., "ci.yml", ".github/workflows/ci.yml")
+        #[arg(short, long)]
+        workflow: String,
+
+        /// Number of runs to analyze
+        #[arg(short, long, default_value = "100")]
+        runs: usize,
+
+        /// GitHub API token (or set GITHUB_TOKEN env var)
+        #[arg(short, long)]
+        token: Option<String>,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
@@ -186,6 +211,9 @@ fn main() -> Result<()> {
         }
         Commands::Flaky { paths, min_runs, threshold, format } => {
             cmd_flaky(&paths, min_runs, threshold, &format)
+        }
+        Commands::History { repo, workflow, runs, token, format } => {
+            cmd_history(&repo, &workflow, runs, token, &format).await
         }
     }
 }
@@ -525,6 +553,59 @@ fn cmd_flaky(
         }
         _ => {
             display::print_flaky_report(&report, &junit_files);
+        }
+    }
+
+    Ok(())
+}
+
+async fn cmd_history(
+    repo: &str,
+    workflow: &str,
+    runs: usize,
+    token: Option<String>,
+    format: &str,
+) -> Result<()> {
+    // Parse repository owner/name
+    let parts: Vec<&str> = repo.split('/').collect();
+    if parts.len() != 2 {
+        anyhow::bail!("Invalid repository format. Expected: owner/repo (e.g., microsoft/vscode)");
+    }
+    let (owner, repo_name) = (parts[0], parts[1]);
+
+    // Normalize workflow file name
+    let workflow_file = if workflow.starts_with(".github/workflows/") {
+        workflow.trim_start_matches(".github/workflows/")
+    } else {
+        workflow
+    };
+
+    // Get token from argument or environment
+    let api_token = token.or_else(|| std::env::var("GITHUB_TOKEN").ok());
+
+    println!("🔍 Analyzing workflow run history...");
+    println!("   Repository: {}/{}", owner, repo_name);
+    println!("   Workflow: {}", workflow_file);
+    println!("   Runs to analyze: {}", runs);
+    println!();
+
+    // Create GitHub API client
+    let client = GitHubClient::new(api_token)
+        .context("Failed to create GitHub API client")?;
+
+    // Fetch and analyze workflow history
+    let stats = client
+        .analyze_workflow_history(owner, repo_name, workflow_file, runs)
+        .await
+        .context("Failed to analyze workflow history")?;
+
+    match format {
+        "json" => {
+            let json = serde_json::to_string_pretty(&stats)?;
+            println!("{}", json);
+        }
+        _ => {
+            display::print_history_stats(&stats);
         }
     }
 

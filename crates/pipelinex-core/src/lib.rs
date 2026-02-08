@@ -6,6 +6,7 @@ pub mod simulator;
 pub mod graph;
 pub mod test_selector;
 pub mod flaky_detector;
+pub mod providers;
 
 pub use parser::dag::{PipelineDag, JobNode, StepInfo, DagEdge};
 pub use parser::github::GitHubActionsParser;

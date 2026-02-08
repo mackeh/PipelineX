@@ -15,3 +15,6 @@ anyhow = { workspace = true }
 regex = { workspace = true }
 glob = { workspace = true }
 quick-xml = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+chrono = { workspace = true }
