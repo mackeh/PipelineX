@@ -12,6 +12,8 @@ pub mod test_selector;
 pub use analyzer::report::{AnalysisReport, Finding, Severity};
 pub use flaky_detector::{FlakyCategory, FlakyDetector, FlakyReport, FlakyTest};
 pub use optimizer::Optimizer;
+pub use parser::aws_codepipeline::AwsCodePipelineParser;
+pub use parser::azure::AzurePipelinesParser;
 pub use parser::bitbucket::BitbucketParser;
 pub use parser::circleci::CircleCIParser;
 pub use parser::dag::{DagEdge, JobNode, PipelineDag, StepInfo};

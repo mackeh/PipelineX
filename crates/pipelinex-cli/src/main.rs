@@ -3,6 +3,8 @@ mod display;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use pipelinex_core::analyzer;
+use pipelinex_core::parser::aws_codepipeline::AwsCodePipelineParser;
+use pipelinex_core::parser::azure::AzurePipelinesParser;
 use pipelinex_core::flaky_detector::FlakyDetector;
 use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::parser::bitbucket::BitbucketParser;
@@ -257,6 +259,20 @@ fn parse_pipeline(path: &std::path::Path) -> Result<pipelinex_core::PipelineDag>
     } else if path_str.contains("circleci") || path_str.contains(".circleci") {
         CircleCIParser::parse_file(path)
             .with_context(|| format!("Failed to parse CircleCI config: {}", path.display()))
+    } else if filename == "azure-pipelines.yml"
+        || filename == "azure-pipelines.yaml"
+        || path_str.contains("azure-pipelines")
+    {
+        AzurePipelinesParser::parse_file(path)
+            .with_context(|| format!("Failed to parse Azure Pipelines file: {}", path.display()))
+    } else if filename == "codepipeline.json"
+        || filename == "codepipeline.yaml"
+        || filename == "codepipeline.yml"
+        || filename == "pipeline.json" && path_str.contains("codepipeline")
+        || path_str.contains("aws-codepipeline")
+    {
+        AwsCodePipelineParser::parse_file(path)
+            .with_context(|| format!("Failed to parse AWS CodePipeline file: {}", path.display()))
     } else if filename == "bitbucket-pipelines.yml"
         || filename == "bitbucket-pipelines.yaml"
         || path_str.contains("bitbucket")
@@ -281,6 +297,10 @@ fn discover_workflow_files(path: &Path) -> Result<Vec<PathBuf>> {
             .context("Failed to read glob pattern")?
             .chain(
                 glob::glob(&format!("{}/**/*.yaml", path.display()))
+                    .context("Failed to read glob pattern")?,
+            )
+            .chain(
+                glob::glob(&format!("{}/**/*.json", path.display()))
                     .context("Failed to read glob pattern")?,
             )
             .filter_map(|r| r.ok())
