@@ -50,7 +50,7 @@ impl GitLabCIParser {
         let default_image = yaml.get("default")
             .and_then(|d| d.get("image"))
             .or_else(|| yaml.get("image"))
-            .and_then(|v| Self::parse_image(v));
+            .and_then(Self::parse_image);
 
         // Collect all jobs (anything not a reserved keyword and not starting with '.')
         let mut jobs_by_stage: HashMap<String, Vec<String>> = HashMap::new();
@@ -161,7 +161,7 @@ impl GitLabCIParser {
 
         // Image (runner)
         let image = config.get("image")
-            .and_then(|v| Self::parse_image(v))
+            .and_then(Self::parse_image)
             .or_else(|| default_image.clone())
             .unwrap_or_else(|| "docker".to_string());
         job.runs_on = image;
@@ -285,7 +285,7 @@ impl GitLabCIParser {
                     match v {
                         Value::String(s) => Some(s.clone()),
                         Value::Mapping(m) => {
-                            m.get(&Value::String("job".to_string()))
+                            m.get(Value::String("job".to_string()))
                                 .and_then(|v| v.as_str())
                                 .map(String::from)
                         }
@@ -308,7 +308,7 @@ impl GitLabCIParser {
                         Value::Bool(b) => b.to_string(),
                         Value::Mapping(m) => {
                             // GitLab expanded variable syntax: { value: "x", description: "..." }
-                            m.get(&Value::String("value".to_string()))
+                            m.get(Value::String("value".to_string()))
                                 .and_then(|v| v.as_str())
                                 .unwrap_or("")
                                 .to_string()
@@ -326,7 +326,7 @@ impl GitLabCIParser {
         match v {
             Value::String(s) => Some(s.clone()),
             Value::Mapping(m) => {
-                m.get(&Value::String("name".to_string()))
+                m.get(Value::String("name".to_string()))
                     .and_then(|v| v.as_str())
                     .map(String::from)
             }
@@ -366,6 +366,7 @@ impl GitLabCIParser {
         triggers
     }
 
+    #[allow(clippy::if_same_then_else)]
     fn estimate_cmd_duration(cmd: &str) -> f64 {
         let cmd_lower = cmd.to_lowercase();
         if cmd_lower.contains("npm ci") || cmd_lower.contains("npm install") || cmd_lower.contains("yarn install") {

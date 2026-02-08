@@ -95,7 +95,7 @@ fn detect_redundant_checkouts(dag: &PipelineDag) -> Vec<Finding> {
 
     for job in dag.graph.node_weights() {
         let has_install = job.steps.iter().any(|s| {
-            s.run.as_ref().map_or(false, |r| {
+            s.run.as_ref().is_some_and(|r| {
                 let cmd = r.to_lowercase();
                 cmd.contains("npm ci") || cmd.contains("npm install")
                     || cmd.contains("pip install") || cmd.contains("yarn install")

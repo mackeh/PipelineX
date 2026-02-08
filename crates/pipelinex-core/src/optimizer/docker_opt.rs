@@ -94,8 +94,8 @@ fn parse_dockerfile(content: &str) -> Vec<DockerInstruction> {
         }
 
         // Handle line continuations
-        if trimmed.ends_with('\\') {
-            continuation.push_str(&trimmed[..trimmed.len() - 1]);
+        if let Some(stripped) = trimmed.strip_suffix('\\') {
+            continuation.push_str(stripped);
             continuation.push(' ');
             continue;
         }
@@ -482,7 +482,7 @@ CMD ["python", "-m", "gunicorn", "app:app", "--bind", "0.0.0.0:8000"]
 }
 
 fn generate_go_dockerfile(_instructions: &[DockerInstruction]) -> String {
-    format!(r#"# Optimized by PipelineX — Go multi-stage build
+    r#"# Optimized by PipelineX — Go multi-stage build
 
 # Stage 1: Build
 FROM golang:1.22-alpine AS build
@@ -498,7 +498,7 @@ COPY --from=build /app/server /server
 EXPOSE 8080
 USER nonroot
 ENTRYPOINT ["/server"]
-"#)
+"#.to_string()
 }
 
 fn estimate_build_time(instructions: &[DockerInstruction], optimized: bool) -> f64 {

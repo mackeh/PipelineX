@@ -2,6 +2,7 @@ use crate::analyzer::report::AnalysisReport;
 use crate::parser::dag::PipelineDag;
 
 /// Generate a self-contained HTML report with interactive visualizations.
+#[allow(clippy::format_in_format_args)]
 pub fn generate_html_report(report: &AnalysisReport, dag: &PipelineDag) -> String {
     let critical_path_json = serde_json::to_string(&report.critical_path).unwrap_or_else(|_| "[]".to_string());
     let findings_json = serde_json::to_string(&report.findings).unwrap_or_else(|_| "[]".to_string());

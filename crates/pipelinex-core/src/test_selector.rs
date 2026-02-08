@@ -220,7 +220,7 @@ impl TestSelector {
         }
 
         let output = cmd
-            .args(&["diff", "--name-only", base, head])
+            .args(["diff", "--name-only", base, head])
             .output()
             .context("Failed to run git diff")?;
 

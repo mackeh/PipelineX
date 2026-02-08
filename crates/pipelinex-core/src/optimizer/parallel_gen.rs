@@ -43,17 +43,17 @@ fn remove_false_dependency(
                 Value::String(s) if s == dependency_id => {
                     // If this was the only dependency, remove the needs field entirely
                     if let Some(mapping) = job_config.as_mapping_mut() {
-                        mapping.remove(&Value::String("needs".to_string()));
+                        mapping.remove(Value::String("needs".to_string()));
                     }
                 }
                 Value::Sequence(seq) => {
                     seq.retain(|v| {
-                        v.as_str().map_or(true, |s| s != dependency_id)
+                        v.as_str().is_none_or(|s| s != dependency_id)
                     });
                     // If no dependencies left, remove needs
                     if seq.is_empty() {
                         if let Some(mapping) = job_config.as_mapping_mut() {
-                            mapping.remove(&Value::String("needs".to_string()));
+                            mapping.remove(Value::String("needs".to_string()));
                         }
                     }
                 }

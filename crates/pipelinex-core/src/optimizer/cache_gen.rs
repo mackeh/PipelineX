@@ -49,7 +49,7 @@ fn inject_cache_step(job_config: &mut Value, finding_title: &str) {
     let checkout_idx = steps.iter().position(|s| {
         s.get("uses")
             .and_then(|v| v.as_str())
-            .map_or(false, |u| u.starts_with("actions/checkout"))
+            .is_some_and(|u| u.starts_with("actions/checkout"))
     });
 
     let insert_idx = checkout_idx.map(|i| i + 1).unwrap_or(0);

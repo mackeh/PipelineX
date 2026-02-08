@@ -185,14 +185,14 @@ impl JenkinsParser {
 
     fn extract_agent(block_content: &str) -> String {
         // Check for docker agent
-        if let Some(docker_match) = Regex::new(r#"agent\s*\{\s*docker\s*['"]([^'"]+)['"]"#).ok() {
+        if let Ok(docker_match) = Regex::new(r#"agent\s*\{\s*docker\s*['"]([^'"]+)['"]"#) {
             if let Some(cap) = docker_match.captures(block_content) {
                 return format!("docker:{}", &cap[1]);
             }
         }
 
         // Check for label
-        if let Some(label_match) = Regex::new(r#"agent\s*\{\s*label\s*['"]([^'"]+)['"]"#).ok() {
+        if let Ok(label_match) = Regex::new(r#"agent\s*\{\s*label\s*['"]([^'"]+)['"]"#) {
             if let Some(cap) = label_match.captures(block_content) {
                 return cap[1].to_string();
             }
@@ -202,7 +202,7 @@ impl JenkinsParser {
     }
 
     fn extract_when_condition(block_content: &str) -> Option<String> {
-        if let Some(when_re) = Regex::new(r#"when\s*\{([^}]+)\}"#).ok() {
+        if let Ok(when_re) = Regex::new(r#"when\s*\{([^}]+)\}"#) {
             if let Some(cap) = when_re.captures(block_content) {
                 return Some(cap[1].trim().to_string());
             }
@@ -284,6 +284,7 @@ impl JenkinsParser {
         caches
     }
 
+    #[allow(clippy::regex_creation_in_loops)]
     fn handle_parallel_stages(dag: &mut PipelineDag, content: &str) -> Result<()> {
         // Match parallel blocks: parallel { stage1: { ... }, stage2: { ... } }
         let parallel_re = Regex::new(r"parallel\s*\{")

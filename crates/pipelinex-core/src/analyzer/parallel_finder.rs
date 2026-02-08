@@ -50,8 +50,8 @@ pub fn find_parallelization_opportunities(dag: &PipelineDag) -> Vec<Finding> {
 
     // Check for test jobs that could be sharded
     for job in dag.graph.node_weights() {
-        if is_test_job(job) && job.matrix.is_none() {
-            if job.estimated_duration_secs > 300.0 {
+        if is_test_job(job) && job.matrix.is_none()
+            && job.estimated_duration_secs > 300.0 {
                 // Test job takes >5 min and isn't sharded
                 let optimal_shards = (job.estimated_duration_secs / 120.0).ceil() as usize;
                 let optimal_shards = optimal_shards.clamp(2, 8);
@@ -84,7 +84,6 @@ pub fn find_parallelization_opportunities(dag: &PipelineDag) -> Vec<Finding> {
                     auto_fixable: true,
                 });
             }
-        }
     }
 
     findings

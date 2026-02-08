@@ -12,7 +12,7 @@ use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::test_selector::TestSelector;
 use pipelinex_core::flaky_detector::FlakyDetector;
 use pipelinex_core::providers::GitHubClient;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
 #[command(
@@ -251,9 +251,9 @@ fn parse_pipeline(path: &std::path::Path) -> Result<pipelinex_core::PipelineDag>
     }
 }
 
-fn discover_workflow_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
+fn discover_workflow_files(path: &Path) -> Result<Vec<PathBuf>> {
     if path.is_file() {
-        return Ok(vec![path.clone()]);
+        return Ok(vec![path.to_path_buf()]);
     }
 
     if path.is_dir() {
@@ -273,7 +273,7 @@ fn discover_workflow_files(path: &PathBuf) -> Result<Vec<PathBuf>> {
     anyhow::bail!("Path '{}' does not exist", path.display());
 }
 
-fn cmd_analyze(path: &PathBuf, format: &str) -> Result<()> {
+fn cmd_analyze(path: &Path, format: &str) -> Result<()> {
     let files = discover_workflow_files(path)?;
 
     if files.is_empty() {
@@ -346,7 +346,7 @@ fn cmd_diff(path: &PathBuf) -> Result<()> {
     cmd_optimize(path, None, true)
 }
 
-fn cmd_cost(path: &PathBuf, runs_per_month: u32, team_size: u32, hourly_rate: f64) -> Result<()> {
+fn cmd_cost(path: &Path, runs_per_month: u32, team_size: u32, hourly_rate: f64) -> Result<()> {
     let files = discover_workflow_files(path)?;
 
     if files.is_empty() {
@@ -377,7 +377,7 @@ fn cmd_cost(path: &PathBuf, runs_per_month: u32, team_size: u32, hourly_rate: f6
     Ok(())
 }
 
-fn cmd_graph(path: &PathBuf, format: &str, output: Option<&std::path::Path>) -> Result<()> {
+fn cmd_graph(path: &Path, format: &str, output: Option<&std::path::Path>) -> Result<()> {
     if !path.is_file() {
         anyhow::bail!("'{}' is not a file.", path.display());
     }
@@ -403,7 +403,7 @@ fn cmd_graph(path: &PathBuf, format: &str, output: Option<&std::path::Path>) -> 
     Ok(())
 }
 
-fn cmd_simulate(path: &PathBuf, runs: usize, variance: f64, format: &str) -> Result<()> {
+fn cmd_simulate(path: &Path, runs: usize, variance: f64, format: &str) -> Result<()> {
     if !path.is_file() {
         anyhow::bail!("'{}' is not a file.", path.display());
     }

@@ -7,6 +7,7 @@ use std::time::Duration;
 /// GitHub API client for fetching workflow run history
 pub struct GitHubClient {
     client: reqwest::Client,
+    #[allow(dead_code)]
     token: Option<String>,
     base_url: String,
 }
@@ -55,6 +56,7 @@ pub struct Step {
 /// API response for workflow runs listing
 #[derive(Debug, Deserialize)]
 struct WorkflowRunsResponse {
+    #[allow(dead_code)]
     total_count: u32,
     workflow_runs: Vec<WorkflowRun>,
 }
@@ -62,6 +64,7 @@ struct WorkflowRunsResponse {
 /// API response for jobs listing
 #[derive(Debug, Deserialize)]
 struct JobsResponse {
+    #[allow(dead_code)]
     total_count: u32,
     jobs: Vec<Job>,
 }
@@ -228,7 +231,7 @@ impl GitHubClient {
                     for job in jobs {
                         job_data
                             .entry(job.name.clone())
-                            .or_insert_with(Vec::new)
+                            .or_default()
                             .push(job);
                     }
                 }

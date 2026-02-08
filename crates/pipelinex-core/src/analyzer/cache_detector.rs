@@ -8,7 +8,7 @@ pub fn detect_missing_caches(dag: &PipelineDag) -> Vec<Finding> {
 
     for job in dag.graph.node_weights() {
         let has_cache_action = job.steps.iter().any(|s| {
-            s.uses.as_ref().map_or(false, |u| u.starts_with("actions/cache"))
+            s.uses.as_ref().is_some_and(|u| u.starts_with("actions/cache"))
         });
 
         for step in &job.steps {
@@ -104,7 +104,7 @@ pub fn detect_missing_caches(dag: &PipelineDag) -> Vec<Finding> {
                 // Docker build without layer caching
                 if is_docker_build(&cmd) {
                     let has_docker_cache = job.steps.iter().any(|s| {
-                        s.uses.as_ref().map_or(false, |u| u.starts_with("docker/build-push-action"))
+                        s.uses.as_ref().is_some_and(|u| u.starts_with("docker/build-push-action"))
                     });
                     if !has_docker_cache && !cmd.contains("--cache-from") {
                         findings.push(Finding {

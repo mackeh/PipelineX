@@ -148,7 +148,7 @@ pub fn to_ascii(dag: &PipelineDag) -> String {
         }
 
         if level < max_level {
-            lines.push(format!("         │"));
+            lines.push("         │".to_string());
         }
     }
 

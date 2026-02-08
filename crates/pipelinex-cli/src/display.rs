@@ -1,7 +1,6 @@
 use colored::*;
 use pipelinex_core::analyzer::report::{AnalysisReport, Finding, Severity, format_duration};
 use pipelinex_core::cost::CostEstimate;
-use pipelinex_core::health_score::HealthScore;
 use pipelinex_core::simulator::SimulationResult;
 use pipelinex_core::optimizer::docker_opt::{DockerAnalysis, DockerSeverity};
 use pipelinex_core::test_selector::TestSelection;
@@ -51,9 +50,8 @@ pub fn print_analysis_report(report: &AnalysisReport) {
     // Findings
     if report.findings.is_empty() {
         println!(
-            " {} {}",
-            "OK".green().bold(),
-            "No significant bottlenecks detected. Your pipeline looks good!"
+            " {} No significant bottlenecks detected. Your pipeline looks good!",
+            "OK".green().bold()
         );
     } else {
         for finding in &report.findings {
@@ -400,7 +398,7 @@ pub fn print_docker_analysis(path: &Path, analysis: &DockerAnalysis) {
     println!();
 
     if analysis.findings.is_empty() {
-        println!(" {} {}", "OK".green().bold(), "Dockerfile looks well-optimized!");
+        println!(" {} Dockerfile looks well-optimized!", "OK".green().bold());
     } else {
         println!(" {}", "=".repeat(60).dimmed());
         println!();
@@ -754,9 +752,8 @@ pub fn print_history_stats(stats: &PipelineStatistics) {
         println!("   {} Success rate below 90%",
             "🔴".red()
         );
-        println!("      {} of runs fail. Identify and fix flaky tests or unstable jobs.",
-            format!("{:.0}%", (1.0 - stats.success_rate) * 100.0)
-        );
+        let failure_pct = format!("{:.0}%", (1.0 - stats.success_rate) * 100.0);
+        println!("      {} of runs fail. Identify and fix flaky tests or unstable jobs.", failure_pct);
         println!();
     }
 

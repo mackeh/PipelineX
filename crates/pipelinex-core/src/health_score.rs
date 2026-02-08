@@ -78,6 +78,7 @@ impl HealthScoreCalculator {
     }
 
     /// Calculate health score from pipeline metrics
+    #[allow(clippy::too_many_arguments)]
     pub fn calculate(
         &self,
         duration_secs: f64,
@@ -156,6 +157,7 @@ impl HealthScoreCalculator {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn generate_recommendations(
         &self,
         duration_score: f64,

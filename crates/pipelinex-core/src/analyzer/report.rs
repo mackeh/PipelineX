@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::health_score::{HealthScore, HealthScoreCalculator};
+use crate::health_score::HealthScore;
 
 /// Severity level for analysis findings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
