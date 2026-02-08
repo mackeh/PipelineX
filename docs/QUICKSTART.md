@@ -55,6 +55,12 @@ pipelinex analyze .circleci/config.yml
 
 # Bitbucket Pipelines
 pipelinex analyze bitbucket-pipelines.yml
+
+# Azure Pipelines
+pipelinex analyze azure-pipelines.yml
+
+# AWS CodePipeline
+pipelinex analyze codepipeline.json
 ```
 
 **Example output:**

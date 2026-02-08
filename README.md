@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/mackeh/PipelineX/actions/workflows/ci.yml/badge.svg)](https://github.com/mackeh/PipelineX/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platforms](https://img.shields.io/badge/platforms-5%20CI%20systems-success)](#supported-ci-platforms)
+[![Platforms](https://img.shields.io/badge/platforms-7%20CI%20systems-success)](#supported-ci-platforms)
 
 [Features](#-features) •
 [Quick Start](#-quick-start) •
@@ -43,13 +43,15 @@ Most of that time is wasted on:
 
 ### 🔍 **Multi-Platform Analysis**
 
-Supports 5 major CI systems:
+Supports 7 major CI systems:
 
 - GitHub Actions
 - GitLab CI
 - Jenkins
 - CircleCI
 - Bitbucket Pipelines
+- Azure Pipelines
+- AWS CodePipeline
 
 Analyzes YAML/Groovy configs offline — no account or API needed.
 
@@ -105,7 +107,7 @@ cd PipelineX
 cargo build --release
 ```
 
-An intelligent CI/CD analysis platform that watches your pipelines, identifies exactly where time and money are wasted, and generates optimized configurations that make builds 2–10x faster. Works across GitHub Actions, GitLab CI, Jenkins, Bitbucket Pipelines, CircleCI, and more — with zero changes to your existing setup.
+An intelligent CI/CD analysis platform that watches your pipelines, identifies exactly where time and money are wasted, and generates optimized configurations that make builds 2–10x faster. Works across GitHub Actions, GitLab CI, Jenkins, Bitbucket Pipelines, CircleCI, Azure Pipelines, AWS CodePipeline, and more — with zero changes to your existing setup.
 
 ![PipelineX Dashboard](assets/dashboard-preview.png)
 
@@ -557,8 +559,8 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 | **Jenkins**             | ✅ Fully Supported | Declarative pipelines, stages, parallel, agents            |
 | **CircleCI**            | ✅ Fully Supported | Workflows, jobs, executors, orbs, caches                   |
 | **Bitbucket Pipelines** | ✅ Fully Supported | Pipelines, parallel, deployments, services                 |
-| Azure Pipelines         | 🔜 Planned         | Stages, jobs, dependencies, templates                      |
-| AWS CodePipeline        | 🔜 Planned         | Stages, actions, artifacts                                 |
+| **Azure Pipelines**     | ✅ Fully Supported | Stages, jobs, dependencies, templates                      |
+| **AWS CodePipeline**    | ✅ Fully Supported | Stages, actions, runOrder, artifacts                       |
 | Drone CI                | 🔜 Planned         | Steps, services, volumes                                   |
 | Travis CI               | 🔜 Planned         | Stages, jobs, matrix                                       |
 
