@@ -24,6 +24,7 @@
 **Developers lose 45-90 minutes daily waiting for CI/CD pipelines.**
 
 Most of that time is wasted on:
+
 - ❌ Missing caches → **2-8 min/run** reinstalling dependencies
 - ❌ Serial jobs that could parallelize → **5-20 min/run**
 - ❌ Running all tests on single-file changes → **3-30 min/run**
@@ -43,6 +44,7 @@ Most of that time is wasted on:
 ### 🔍 **Multi-Platform Analysis**
 
 Supports 5 major CI systems:
+
 - GitHub Actions
 - GitLab CI
 - Jenkins
@@ -57,6 +59,7 @@ Analyzes YAML/Groovy configs offline — no account or API needed.
 ### 🚀 **Smart Optimization**
 
 **12 antipattern detectors:**
+
 - Missing caches
 - Serial bottlenecks
 - False dependencies
@@ -74,6 +77,7 @@ Analyzes YAML/Groovy configs offline — no account or API needed.
 ### 🎨 **Rich Output**
 
 Multiple formats:
+
 - **Text** (colored terminal)
 - **JSON** (structured data)
 - **SARIF** (GitHub Code Scanning)
@@ -100,6 +104,12 @@ git clone https://github.com/mackeh/PipelineX.git
 cd PipelineX
 cargo build --release
 ```
+
+An intelligent CI/CD analysis platform that watches your pipelines, identifies exactly where time and money are wasted, and generates optimized configurations that make builds 2–10x faster. Works across GitHub Actions, GitLab CI, Jenkins, Bitbucket Pipelines, CircleCI, and more — with zero changes to your existing setup.
+
+![PipelineX Dashboard](assets/dashboard-preview.png)
+
+---
 
 ### Basic Usage
 
@@ -176,23 +186,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm ci                    # ← No cache! Reinstalls every run
+      - run: npm ci # ← No cache! Reinstalls every run
 
   lint:
-    needs: setup                       # ← False dependency
+    needs: setup # ← False dependency
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm ci                    # ← Reinstalls again!
+      - run: npm ci # ← Reinstalls again!
       - run: npm run lint
 
   test:
-    needs: lint                        # ← Another false dependency
+    needs: lint # ← Another false dependency
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm ci                    # ← Third reinstall!
-      - run: npm test                  # ← Runs ALL tests on doc changes
+      - run: npm ci # ← Third reinstall!
+      - run: npm test # ← Runs ALL tests on doc changes
 ```
 
 **Running PipelineX:**
@@ -266,9 +276,9 @@ $ pipelinex optimize .github/workflows/ci.yml -o ci-optimized.yml
 # .github/workflows/ci-optimized.yml
 on:
   push:
-    paths-ignore:                    # ← Skip pipeline on doc changes
-      - '**.md'
-      - 'docs/**'
+    paths-ignore: # ← Skip pipeline on doc changes
+      - "**.md"
+      - "docs/**"
 
 jobs:
   setup:
@@ -277,9 +287,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          cache: 'npm'               # ← Built-in caching!
+          cache: "npm" # ← Built-in caching!
       - run: npm ci
-      - uses: actions/cache/save@v4  # ← Save for other jobs
+      - uses: actions/cache/save@v4 # ← Save for other jobs
         with:
           path: node_modules
           key: deps-${{ hashFiles('package-lock.json') }}
@@ -289,18 +299,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/cache/restore@v4  # ← Restore cached deps
+      - uses: actions/cache/restore@v4 # ← Restore cached deps
         with:
           path: node_modules
           key: deps-${{ hashFiles('package-lock.json') }}
       - run: npm run lint
 
   test:
-    needs: setup                     # ← Runs parallel with lint now!
+    needs: setup # ← Runs parallel with lint now!
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        shard: [1, 2, 3]             # ← Sharded tests (3x faster)
+        shard: [1, 2, 3] # ← Sharded tests (3x faster)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache/restore@v4
@@ -318,12 +328,12 @@ jobs:
 
 **Results:**
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| **Time** | 31:00 | 6:12 | **80% faster** ⚡ |
-| **Parallelism** | 1-2 jobs | 4+ jobs | **2x more efficient** |
-| **Cache hits** | 0% | 90%+ | **5 min saved/run** |
-| **Monthly cost** | $240/mo | $48/mo | **$192 saved** 💰 |
+| Metric           | Before   | After   | Improvement           |
+| ---------------- | -------- | ------- | --------------------- |
+| **Time**         | 31:00    | 6:12    | **80% faster** ⚡     |
+| **Parallelism**  | 1-2 jobs | 4+ jobs | **2x more efficient** |
+| **Cache hits**   | 0%       | 90%+    | **5 min saved/run**   |
+| **Monthly cost** | $240/mo  | $48/mo  | **$192 saved** 💰     |
 
 ---
 
@@ -480,6 +490,7 @@ $ open report.html
 ```
 
 **Features:**
+
 - 🎨 Dark mode toggle
 - 📊 Interactive DAG visualization
 - 🔍 Collapsible finding details
@@ -539,17 +550,17 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 
 ## 🏗️ Supported CI Platforms
 
-| Platform | Status | Features |
-|----------|--------|----------|
-| **GitHub Actions** | ✅ Fully Supported | Workflows, jobs, matrices, caches, artifacts, path filters |
-| **GitLab CI** | ✅ Fully Supported | Stages, needs, parallel, rules, hidden jobs, DAG |
-| **Jenkins** | ✅ Fully Supported | Declarative pipelines, stages, parallel, agents |
-| **CircleCI** | ✅ Fully Supported | Workflows, jobs, executors, orbs, caches |
-| **Bitbucket Pipelines** | ✅ Fully Supported | Pipelines, parallel, deployments, services |
-| Azure Pipelines | 🔜 Planned | Stages, jobs, dependencies, templates |
-| AWS CodePipeline | 🔜 Planned | Stages, actions, artifacts |
-| Drone CI | 🔜 Planned | Steps, services, volumes |
-| Travis CI | 🔜 Planned | Stages, jobs, matrix |
+| Platform                | Status             | Features                                                   |
+| ----------------------- | ------------------ | ---------------------------------------------------------- |
+| **GitHub Actions**      | ✅ Fully Supported | Workflows, jobs, matrices, caches, artifacts, path filters |
+| **GitLab CI**           | ✅ Fully Supported | Stages, needs, parallel, rules, hidden jobs, DAG           |
+| **Jenkins**             | ✅ Fully Supported | Declarative pipelines, stages, parallel, agents            |
+| **CircleCI**            | ✅ Fully Supported | Workflows, jobs, executors, orbs, caches                   |
+| **Bitbucket Pipelines** | ✅ Fully Supported | Pipelines, parallel, deployments, services                 |
+| Azure Pipelines         | 🔜 Planned         | Stages, jobs, dependencies, templates                      |
+| AWS CodePipeline        | 🔜 Planned         | Stages, actions, artifacts                                 |
+| Drone CI                | 🔜 Planned         | Steps, services, volumes                                   |
+| Travis CI               | 🔜 Planned         | Stages, jobs, matrix                                       |
 
 **Want your CI platform supported?** [Open an issue](https://github.com/mackeh/PipelineX/issues/new?template=ci_platform_request.md)!
 
@@ -557,18 +568,18 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 
 ## 📋 Commands
 
-| Command | Description | Example |
-|---------|-------------|---------|
-| `analyze` | Analyze pipelines for bottlenecks | `pipelinex analyze .github/workflows/ci.yml` |
-| `optimize` | Generate optimized config | `pipelinex optimize ci.yml -o ci-opt.yml` |
-| `diff` | Show changes between current and optimized | `pipelinex diff ci.yml` |
-| `cost` | Estimate CI/CD costs and savings | `pipelinex cost .github/workflows/ --team-size 10` |
-| `graph` | Visualize pipeline DAG | `pipelinex graph ci.yml --format mermaid` |
-| `simulate` | Monte Carlo simulation | `pipelinex simulate ci.yml --runs 1000` |
-| `docker` | Analyze Dockerfiles | `pipelinex docker Dockerfile --optimize` |
-| `select-tests` | Smart test selection | `pipelinex select-tests HEAD~1 HEAD` |
-| `flaky` | Detect flaky tests | `pipelinex flaky test-results/*.xml` |
-| `history` | Analyze workflow run history | `pipelinex history --repo org/repo --workflow ci.yml --runs 100` |
+| Command        | Description                                | Example                                                          |
+| -------------- | ------------------------------------------ | ---------------------------------------------------------------- |
+| `analyze`      | Analyze pipelines for bottlenecks          | `pipelinex analyze .github/workflows/ci.yml`                     |
+| `optimize`     | Generate optimized config                  | `pipelinex optimize ci.yml -o ci-opt.yml`                        |
+| `diff`         | Show changes between current and optimized | `pipelinex diff ci.yml`                                          |
+| `cost`         | Estimate CI/CD costs and savings           | `pipelinex cost .github/workflows/ --team-size 10`               |
+| `graph`        | Visualize pipeline DAG                     | `pipelinex graph ci.yml --format mermaid`                        |
+| `simulate`     | Monte Carlo simulation                     | `pipelinex simulate ci.yml --runs 1000`                          |
+| `docker`       | Analyze Dockerfiles                        | `pipelinex docker Dockerfile --optimize`                         |
+| `select-tests` | Smart test selection                       | `pipelinex select-tests HEAD~1 HEAD`                             |
+| `flaky`        | Detect flaky tests                         | `pipelinex flaky test-results/*.xml`                             |
+| `history`      | Analyze workflow run history               | `pipelinex history --repo org/repo --workflow ci.yml --runs 100` |
 
 ### Output Formats
 
@@ -583,24 +594,28 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 ## 🎯 Use Cases
 
 ### **For Developers**
+
 - ⚡ Reduce wait time from 30+ min to < 10 min
 - 🎯 Run only relevant tests (85% time saved)
 - 🔧 Understand what slows down CI
 - 🚀 Ship features faster
 
 ### **For DevOps Teams**
+
 - 📊 Cost optimization ($10k-$100k+ annual savings)
 - 🔍 Pipeline health monitoring
 - 📈 Track improvements over time
 - 🛠️ Auto-generate optimized configs
 
 ### **For Platform Engineers**
+
 - 🔄 Migrate between CI platforms
 - 📐 Standardize pipeline patterns
 - 📚 Enforce best practices
 - 🎓 Educate teams on CI/CD
 
 ### **For CTOs**
+
 - 💰 Quantify CI waste
 - 📊 ROI reporting
 - ⏱️ Developer productivity gains
@@ -610,23 +625,24 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 
 ## 🏆 What Makes PipelineX Different
 
-|  | PipelineX | BuildPulse | Datadog CI | Trunk Analytics |
-|--|-----------|------------|-----------|-----------------|
-| **Multi-platform** | ✅ 5 CI systems | ❌ GitHub only | ✅ | ❌ GitHub only |
-| **Offline CLI** | ✅ | ❌ SaaS only | ❌ SaaS only | ❌ SaaS only |
-| **Auto-generates fixes** | ✅ | ❌ | ❌ | ❌ |
-| **Smart test selection** | ✅ | ❌ | ❌ | ❌ |
-| **Flaky test detection** | ✅ | ✅ | ✅ | ✅ |
-| **Docker optimization** | ✅ | ❌ | ❌ | ❌ |
-| **Cost estimation** | ✅ | ❌ | Partial | ❌ |
-| **Pipeline simulation** | ✅ | ❌ | ❌ | ❌ |
-| **Free & open source** | ✅ MIT | ❌ Paid | ❌ Paid | Limited free |
+|                          | PipelineX       | BuildPulse     | Datadog CI   | Trunk Analytics |
+| ------------------------ | --------------- | -------------- | ------------ | --------------- |
+| **Multi-platform**       | ✅ 5 CI systems | ❌ GitHub only | ✅           | ❌ GitHub only  |
+| **Offline CLI**          | ✅              | ❌ SaaS only   | ❌ SaaS only | ❌ SaaS only    |
+| **Auto-generates fixes** | ✅              | ❌             | ❌           | ❌              |
+| **Smart test selection** | ✅              | ❌             | ❌           | ❌              |
+| **Flaky test detection** | ✅              | ✅             | ✅           | ✅              |
+| **Docker optimization**  | ✅              | ❌             | ❌           | ❌              |
+| **Cost estimation**      | ✅              | ❌             | Partial      | ❌              |
+| **Pipeline simulation**  | ✅              | ❌             | ❌           | ❌              |
+| **Free & open source**   | ✅ MIT          | ❌ Paid        | ❌ Paid      | Limited free    |
 
 ---
 
 ## 🔗 Integrations
 
 **GitHub Actions:** [See templates](.github/workflow-templates/)
+
 ```yaml
 - name: Analyze Pipeline
   run: pipelinex analyze .github/workflows/ci.yml --format sarif > results.sarif
@@ -636,6 +652,7 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 ```
 
 **GitLab CI:**
+
 ```yaml
 pipelinex:
   script:
@@ -646,6 +663,7 @@ pipelinex:
 ```
 
 **VS Code:**
+
 ```json
 {
   "tasks": [
@@ -659,6 +677,7 @@ pipelinex:
 ```
 
 **Pre-commit Hook:**
+
 ```bash
 #!/bin/bash
 pipelinex analyze .github/workflows/ci.yml --format json | \
@@ -686,6 +705,7 @@ cargo test --test integration_tests
 ```
 
 **Test Coverage:**
+
 - ✅ 67 tests (41 unit + 26 integration)
 - ✅ 32 fixtures across all platforms
 - ✅ Real-world pipeline samples
@@ -726,6 +746,7 @@ cargo test --test integration_tests
 ```
 
 **Key Components:**
+
 - **Universal Parser:** Normalizes 5 CI formats into unified DAG
 - **Analyzer Suite:** 12 detectors for bottlenecks and antipatterns
 - **Optimizer Engine:** Generates production-ready configs
@@ -736,6 +757,7 @@ cargo test --test integration_tests
 ## 🤝 Contributing
 
 We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+
 - 🛠️ Adding new CI platform parsers (with templates)
 - 🔍 Creating new analyzers
 - ⚙️ Building optimizers
@@ -743,6 +765,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - 🐛 Reporting bugs
 
 **Quick start for contributors:**
+
 1. Fork the repo
 2. Create a feature branch
 3. Follow the templates in CONTRIBUTING.md
@@ -781,7 +804,6 @@ MIT License - see [LICENSE](LICENSE) for details
 - 🐛 [Report bugs](https://github.com/mackeh/PipelineX/issues/new?template=bug_report.md)
 - 💡 [Request features](https://github.com/mackeh/PipelineX/issues/new?template=feature_request.md)
 - 💬 [Join discussions](https://github.com/mackeh/PipelineX/discussions)
-
 
 <div align="center">
 
