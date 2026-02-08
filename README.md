@@ -778,23 +778,6 @@ MIT License - see [LICENSE](LICENSE) for details
 - 💡 [Request features](https://github.com/mackeh/PipelineX/issues/new?template=feature_request.md)
 - 💬 [Join discussions](https://github.com/mackeh/PipelineX/discussions)
 
----
-
-## 🎉 Success Stories
-
-> "PipelineX cut our CI time from 45 minutes to 9 minutes. Our team ships 3x faster now."
->
-> — *DevOps Engineer at TechCorp*
-
-> "Found $50k/year in wasted CI costs in 5 minutes. The ROI was immediate."
->
-> — *CTO at Startup Inc*
-
-> "Smart test selection is a game-changer. We run only affected tests and save 80% of our CI time."
->
-> — *Senior Developer at ScaleUp*
-
----
 
 <div align="center">
 
