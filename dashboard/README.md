@@ -1,19 +1,10 @@
-# PipelineX Dashboard (Phase 3 Starter)
+# PipelineX Dashboard (Phase 3 + Phase 4 Increment)
 
-This dashboard is now wired to the real PipelineX CLI analyzer.
+The dashboard now supports:
 
-## What it does
-
-- Discovers pipeline configs from:
-  - `.github/workflows`
-  - `tests/fixtures`
-- Runs live analysis via:
-  - `POST /api/analyze`
-  - `GET /api/workflows`
-- Ingests GitHub Actions webhooks and auto-refreshes historical stats:
-  - `POST /api/github/webhook`
-  - `GET /api/history`
-- Renders real metrics, severity breakdown, critical path, and recommendations.
+- Live pipeline analysis from real `pipelinex` CLI output
+- GitHub webhook ingestion for workflow history refresh
+- Anonymized community benchmark submissions and cohort comparisons
 
 ## Run locally
 
@@ -26,22 +17,15 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-## API contract
+## API endpoints
 
 ### `GET /api/workflows`
 
-Response:
-
-```json
-{
-  "files": [
-    ".github/workflows/ci.yml",
-    "tests/fixtures/github-actions/simple-ci.yml"
-  ]
-}
-```
+Lists discovered pipeline files from `.github/workflows` and `tests/fixtures`.
 
 ### `POST /api/analyze`
+
+Runs live analysis for a selected pipeline path.
 
 Request:
 
@@ -58,49 +42,47 @@ Accepts GitHub webhook payloads and refreshes history cache when:
 - `x-github-event = workflow_run`
 - `action = completed`
 
-Refreshes by executing:
-
-```bash
-pipelinex history --repo <owner/repo> --workflow <workflow-file> --runs <N> --format json
-```
-
 ### `GET /api/history`
 
-Returns cached snapshots:
+Returns cached workflow history snapshots.
+
+### `POST /api/history`
+
+Manual history refresh endpoint.
+
+Request:
 
 ```json
 {
-  "snapshots": [
-    {
-      "repo": "owner/repo",
-      "workflow": ".github/workflows/ci.yml",
-      "source": "webhook"
-    }
-  ]
+  "repo": "owner/repo",
+  "workflow": ".github/workflows/ci.yml",
+  "runs": 100
 }
 ```
+
+### `POST /api/benchmarks/submit`
+
+Stores anonymized benchmark metrics derived from an analysis report and returns cohort stats.
+
+### `GET /api/benchmarks/stats`
+
+Returns benchmark stats for a cohort.
+
+Query params:
+
+- `provider` (required)
+- `jobCount` (required)
+- `stepCount` (required)
 
 ## Environment variables
 
-- `GITHUB_TOKEN`: token used for history refresh calls (recommended).
-- `GITHUB_WEBHOOK_SECRET`: if set, webhook signatures are required and validated.
-- `PIPELINEX_HISTORY_RUNS`: optional lookback run count for auto-refresh (default `100`).
+- `GITHUB_TOKEN`: used for history refresh calls.
+- `GITHUB_WEBHOOK_SECRET`: enables webhook signature validation.
+- `PIPELINEX_HISTORY_RUNS`: optional lookback window for webhook-triggered refreshes (default `100`).
 
-Response:
+## Local persistence
 
-```json
-{
-  "report": {
-    "pipeline_name": "CI",
-    "provider": "github-actions",
-    "findings": []
-  }
-}
-```
+- History cache: `.pipelinex/history-cache/`
+- Benchmark registry: `.pipelinex/benchmark-registry.json`
 
-## Notes
-
-- The API runs only on Node.js runtime (not Edge).
-- Paths are validated to stay inside repo root.
-- The route prefers local `target/debug/pipelinex` or `target/release/pipelinex`; otherwise it falls back to `cargo run -p pipelinex-cli`.
-- History snapshots are persisted under `.pipelinex/history-cache/`.
+No repository names or workflow paths are stored in benchmark entries.
