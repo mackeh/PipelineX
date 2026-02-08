@@ -10,6 +10,7 @@ import {
   Gauge,
   Play,
   RefreshCw,
+  Trophy,
   Workflow,
   Wrench,
   type LucideIcon,
@@ -25,7 +26,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { AnalysisReport, Finding, HistorySnapshot } from "@/lib/pipelinex";
+import type {
+  AnalysisReport,
+  BenchmarkEntry,
+  BenchmarkStats,
+  Finding,
+  HistorySnapshot,
+} from "@/lib/pipelinex";
 
 type WorkflowsResponse = {
   files?: string[];
@@ -39,6 +46,17 @@ type AnalyzeResponse = {
 
 type HistoryListResponse = {
   snapshots?: HistorySnapshot[];
+  error?: string;
+};
+
+type BenchmarkSubmitResponse = {
+  entry?: BenchmarkEntry;
+  stats?: BenchmarkStats;
+  error?: string;
+};
+
+type BenchmarkStatsResponse = {
+  stats?: BenchmarkStats;
   error?: string;
 };
 
@@ -76,8 +94,75 @@ export default function DashboardPage() {
   const [runningAnalysis, setRunningAnalysis] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historySnapshots, setHistorySnapshots] = useState<HistorySnapshot[]>([]);
+  const [benchmarkStats, setBenchmarkStats] = useState<BenchmarkStats | null>(null);
+  const [benchmarkSubmitting, setBenchmarkSubmitting] = useState(false);
+  const [benchmarkLoading, setBenchmarkLoading] = useState(false);
+  const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  const refreshBenchmarkStats = useCallback(
+    async (nextReport: AnalysisReport) => {
+      setBenchmarkLoading(true);
+      setBenchmarkError(null);
+      try {
+        const params = new URLSearchParams({
+          provider: nextReport.provider,
+          jobCount: String(nextReport.job_count),
+          stepCount: String(nextReport.step_count),
+        });
+        const response = await fetch(`/api/benchmarks/stats?${params.toString()}`);
+        const payload = (await response.json()) as BenchmarkStatsResponse;
+
+        if (!response.ok || !payload.stats) {
+          throw new Error(payload.error || "No benchmark stats available.");
+        }
+
+        setBenchmarkStats(payload.stats);
+      } catch (statsError) {
+        setBenchmarkStats(null);
+        setBenchmarkError(
+          statsError instanceof Error
+            ? statsError.message
+            : "Failed to fetch benchmark stats.",
+        );
+      } finally {
+        setBenchmarkLoading(false);
+      }
+    },
+    [],
+  );
+
+  const submitBenchmark = useCallback(
+    async (nextReport: AnalysisReport) => {
+      setBenchmarkSubmitting(true);
+      setBenchmarkError(null);
+      try {
+        const response = await fetch("/api/benchmarks/submit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ report: nextReport, source: "dashboard-live" }),
+        });
+        const payload = (await response.json()) as BenchmarkSubmitResponse;
+
+        if (!response.ok || !payload.stats) {
+          throw new Error(payload.error || "Benchmark submission failed.");
+        }
+
+        setBenchmarkStats(payload.stats);
+      } catch (submitError) {
+        setBenchmarkError(
+          submitError instanceof Error
+            ? submitError.message
+            : "Failed to submit benchmark entry.",
+        );
+        await refreshBenchmarkStats(nextReport);
+      } finally {
+        setBenchmarkSubmitting(false);
+      }
+    },
+    [refreshBenchmarkStats],
+  );
 
   const runAnalysis = useCallback(async (pipelinePath: string) => {
     if (!pipelinePath) {
@@ -101,6 +186,7 @@ export default function DashboardPage() {
 
       setReport(payload.report);
       setLastUpdated(new Date().toLocaleString());
+      await submitBenchmark(payload.report);
     } catch (analysisError) {
       setError(
         analysisError instanceof Error ? analysisError.message : "Analysis failed unexpectedly.",
@@ -108,7 +194,7 @@ export default function DashboardPage() {
     } finally {
       setRunningAnalysis(false);
     }
-  }, []);
+  }, [submitBenchmark]);
 
   const loadHistorySnapshots = useCallback(async () => {
     setLoadingHistory(true);
@@ -228,6 +314,12 @@ export default function DashboardPage() {
   const savingsPercent = report
     ? (savingsSeconds / Math.max(report.total_estimated_duration_secs, 1)) * 100
     : 0;
+  const durationDeltaVsMedian =
+    report && benchmarkStats
+      ? report.total_estimated_duration_secs - benchmarkStats.duration_median_secs
+      : null;
+  const improvementDeltaVsMedian =
+    benchmarkStats ? savingsPercent - benchmarkStats.improvement_median_pct : null;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100">
@@ -419,6 +511,101 @@ export default function DashboardPage() {
               </section>
 
               <section className="mt-5">
+                <Panel title="Community Benchmarks (Anonymized)">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm text-zinc-400">
+                      Compare this run against similar pipelines without storing repo identifiers.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (report) {
+                          void refreshBenchmarkStats(report);
+                        }
+                      }}
+                      disabled={!report || benchmarkLoading}
+                      className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:border-cyan-400 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <RefreshCw
+                        className={`h-3.5 w-3.5 ${benchmarkLoading ? "animate-spin" : ""}`}
+                      />
+                      Refresh Cohort
+                    </button>
+                  </div>
+
+                  {benchmarkError && (
+                    <p className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                      {benchmarkError}
+                    </p>
+                  )}
+
+                  {benchmarkStats ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <BenchmarkTile
+                        label="Cohort"
+                        value={benchmarkStats.cohort}
+                        sublabel={`${benchmarkStats.sample_count} samples`}
+                        icon={Trophy}
+                      />
+                      <BenchmarkTile
+                        label="Median Duration"
+                        value={formatDuration(benchmarkStats.duration_median_secs)}
+                        sublabel={`P75 ${formatDuration(benchmarkStats.duration_p75_secs)}`}
+                        icon={Clock3}
+                      />
+                      <BenchmarkTile
+                        label="Median Improvement"
+                        value={percentage(benchmarkStats.improvement_median_pct)}
+                        sublabel={`You: ${percentage(savingsPercent)}`}
+                        icon={Gauge}
+                      />
+                      <BenchmarkTile
+                        label="Median Findings"
+                        value={benchmarkStats.finding_median.toFixed(1)}
+                        sublabel={
+                          benchmarkStats.health_score_median !== null
+                            ? `Health ${benchmarkStats.health_score_median.toFixed(1)}`
+                            : "Health n/a"
+                        }
+                        icon={AlertTriangle}
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-sm text-zinc-400">
+                      {benchmarkSubmitting
+                        ? "Submitting anonymized benchmark sample..."
+                        : "No benchmark stats yet for this cohort."}
+                    </p>
+                  )}
+
+                  {benchmarkStats && durationDeltaVsMedian !== null && improvementDeltaVsMedian !== null && (
+                    <div className="mt-3 space-y-1 text-xs text-zinc-300">
+                      <p>
+                        Duration vs median:{" "}
+                        <span className={durationDeltaVsMedian <= 0 ? "text-emerald-300" : "text-amber-300"}>
+                          {durationDeltaVsMedian <= 0 ? "faster" : "slower"} by{" "}
+                          {formatDuration(Math.abs(durationDeltaVsMedian))}
+                        </span>
+                      </p>
+                      <p>
+                        Improvement vs median:{" "}
+                        <span
+                          className={
+                            improvementDeltaVsMedian >= 0
+                              ? "text-emerald-300"
+                              : "text-amber-300"
+                          }
+                        >
+                          {improvementDeltaVsMedian >= 0 ? "+" : ""}
+                          {percentage(improvementDeltaVsMedian)}
+                        </span>
+                      </p>
+                    </div>
+                  )}
+                </Panel>
+              </section>
+
+              <section className="mt-5">
                 <Panel title="Webhook History Cache">
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-sm text-zinc-400">
@@ -554,6 +741,29 @@ function FindingRow({ finding }: { finding: Finding }) {
       <p className="mt-2 text-xs text-zinc-400">
         Recommended: {finding.recommendation}
       </p>
+    </article>
+  );
+}
+
+function BenchmarkTile({
+  label,
+  value,
+  sublabel,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  sublabel: string;
+  icon: LucideIcon;
+}) {
+  return (
+    <article className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+      <div className="mb-2 inline-flex rounded-lg bg-zinc-800 p-2 text-cyan-300">
+        <Icon className="h-4 w-4" />
+      </div>
+      <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">{label}</p>
+      <p className="mt-1 text-lg font-semibold text-zinc-50">{value}</p>
+      <p className="mt-1 text-xs text-zinc-400">{sublabel}</p>
     </article>
   );
 }
