@@ -438,15 +438,15 @@ mod tests {
     fn test_has_critical_changes() {
         let selector = TestSelector::new();
 
-        let files = vec![PathBuf::from(".github/workflows/ci.yml")];
+        let files = [PathBuf::from(".github/workflows/ci.yml")];
         let file_refs: Vec<_> = files.iter().collect();
         assert!(selector.has_critical_changes(&file_refs));
 
-        let files = vec![PathBuf::from("package.json")];
+        let files = [PathBuf::from("package.json")];
         let file_refs: Vec<_> = files.iter().collect();
         assert!(selector.has_critical_changes(&file_refs));
 
-        let files = vec![PathBuf::from("src/main.rs")];
+        let files = [PathBuf::from("src/main.rs")];
         let file_refs: Vec<_> = files.iter().collect();
         assert!(!selector.has_critical_changes(&file_refs));
     }
