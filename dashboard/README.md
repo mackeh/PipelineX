@@ -80,6 +80,24 @@ Query params:
 - `jobCount` (required)
 - `stepCount` (required)
 
+### `POST /api/impact/track`
+
+Tracks optimization impact and computes estimated monthly savings.
+
+Request supports either:
+
+- `{ report: AnalysisReport, runsPerMonth?: number, source?: string }`
+- `{ beforeDurationSecs: number, afterDurationSecs: number, runsPerMonth: number, source?: string, provider?: string }`
+
+### `GET /api/impact/stats`
+
+Returns optimization impact summary metrics.
+
+Query params:
+
+- `source` (optional)
+- `provider` (optional)
+
 ### Public API (keyed)
 
 - `GET /api/public/v1/auth/me`
@@ -88,6 +106,8 @@ Query params:
 - `POST /api/public/v1/analyze`
 - `GET /api/public/v1/history`
 - `POST /api/public/v1/history`
+- `GET /api/public/v1/impact/stats`
+- `POST /api/public/v1/impact/track`
 - `GET /api/public/v1/audit/logs`
 - `GET /api/public/v1/benchmarks/stats`
 - `POST /api/public/v1/benchmarks/submit`
@@ -104,10 +124,10 @@ Role-aware key config is supported via:
 
 Built-in roles:
 
-- `admin`: full access (`benchmarks`, `audit`, `workflows`, `analysis`, `history`)
-- `analyst`: `benchmarks:read`, `audit:read`, `workflows:read`, `analysis:run`, `history:read`
-- `ingest`: `benchmarks:write`, `analysis:run`, `history:write`
-- `viewer`: `benchmarks:read`, `workflows:read`, `history:read`
+- `admin`: full access (`benchmarks`, `audit`, `workflows`, `analysis`, `history`, `impact`)
+- `analyst`: `benchmarks:read`, `audit:read`, `workflows:read`, `analysis:run`, `history:read`, `impact:read`
+- `ingest`: `benchmarks:write`, `analysis:run`, `history:write`, `impact:write`
+- `viewer`: `benchmarks:read`, `workflows:read`, `history:read`, `impact:read`
 - `auditor`: `audit:read`
 
 Custom integration scopes:
@@ -116,6 +136,8 @@ Custom integration scopes:
 - `analysis:run`
 - `history:read`
 - `history:write`
+- `impact:read`
+- `impact:write`
 
 `GET /api/public/v1/audit/logs` query params:
 
@@ -154,11 +176,13 @@ Custom integration scopes:
 - `PIPELINEX_ENTERPRISE_SESSION_TTL_SECONDS`: optional enterprise session TTL.
 - `PIPELINEX_SSO_SHARED_SECRET`: required to verify inbound SSO assertions.
 - `PIPELINEX_ENTERPRISE_RATE_LIMIT_PER_MINUTE`: optional enterprise-token rate limit.
+- `PIPELINEX_IMPACT_DEFAULT_RUNS_PER_MONTH`: optional default used for impact tracking when `runsPerMonth` is omitted.
 
 ## Local persistence
 
 - History cache: `.pipelinex/history-cache/`
 - Benchmark registry: `.pipelinex/benchmark-registry.json`
+- Optimization impact registry: `.pipelinex/optimization-impact-registry.json`
 - Public API rate-limit store: `.pipelinex/public-api-rate-limits.json`
 - Public API audit log: `.pipelinex/public-api-audit.log`
 

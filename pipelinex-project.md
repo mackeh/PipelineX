@@ -800,7 +800,7 @@ pipelinex/
 - [x] Azure Pipelines + AWS CodePipeline + Buildkite parsers
 - [x] VS Code extension with inline workflow optimization hints
 - [x] Community benchmark registry (anonymized — "your pipeline vs. similar projects")
-- [ ] Optimization impact tracking ("this change saved X min/month")
+- [x] Optimization impact tracking ("this change saved X min/month")
 - [x] Enterprise SSO, RBAC, audit logs
 - [x] Self-hosted deployment (Docker Compose + Helm chart)
 - [x] REST API for custom integrations

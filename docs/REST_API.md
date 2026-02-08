@@ -22,6 +22,8 @@ Send one of:
 - `POST /api/public/v1/analyze`
 - `GET /api/public/v1/history`
 - `POST /api/public/v1/history`
+- `GET /api/public/v1/impact/stats`
+- `POST /api/public/v1/impact/track`
 - `GET /api/public/v1/benchmarks/stats`
 - `POST /api/public/v1/benchmarks/submit`
 - `GET /api/public/v1/audit/logs`
@@ -32,6 +34,8 @@ Send one of:
 - `analysis:run`: run analysis for a pipeline file
 - `history:read`: read cached workflow history snapshots
 - `history:write`: refresh workflow history snapshots
+- `impact:read`: query optimization impact metrics
+- `impact:write`: track optimization impact events
 - `benchmarks:read`: query benchmark cohort stats
 - `benchmarks:write`: submit benchmark reports
 - `audit:read`: query public API audit logs
@@ -67,6 +71,18 @@ curl -sS \
   -H "Content-Type: application/json" \
   -d '{"repo":"owner/repo","workflow":".github/workflows/ci.yml","runs":100}' \
   http://localhost:3000/api/public/v1/history
+
+# Track optimization impact from a report
+curl -sS \
+  -H "Authorization: Bearer $PIPELINEX_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"report":{"provider":"github-actions","total_estimated_duration_secs":1800,"optimized_duration_secs":900,"pipeline_name":"ci","source_file":".github/workflows/ci.yml","job_count":4,"step_count":12,"max_parallelism":2,"critical_path":[],"critical_path_duration_secs":1800,"findings":[],"health_score":null},"runsPerMonth":300}' \
+  http://localhost:3000/api/public/v1/impact/track
+
+# Query optimization impact metrics
+curl -sS \
+  -H "Authorization: Bearer $PIPELINEX_API_KEY" \
+  http://localhost:3000/api/public/v1/impact/stats
 ```
 
 ## Response metadata
