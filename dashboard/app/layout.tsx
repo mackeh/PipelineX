@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+});
+
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-ibm-plex-mono",
+});
 
 export const metadata: Metadata = {
-  title: "PipelineX Dashboard",
-  description: "CI/CD Bottleneck Analyzer & Optimizer",
+  title: "PipelineX Platform Dashboard",
+  description: "Live CI/CD bottleneck analysis and optimization insights.",
 };
 
 export default function RootLayout({
@@ -16,9 +25,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${inter.className} bg-slate-900 text-slate-100 antialiased`}
-      >
+      <body className={`${spaceGrotesk.variable} ${plexMono.variable} antialiased`}>
         {children}
       </body>
     </html>
