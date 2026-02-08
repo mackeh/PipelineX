@@ -13,6 +13,7 @@ use pipelinex_core::parser::circleci::CircleCIParser;
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
 use pipelinex_core::parser::jenkins::JenkinsParser;
+use pipelinex_core::plugins;
 use pipelinex_core::providers::GitHubClient;
 use pipelinex_core::test_selector::TestSelector;
 use std::path::{Path, PathBuf};
@@ -187,6 +188,33 @@ enum Commands {
         #[arg(short, long, default_value = "text")]
         format: String,
     },
+
+    /// External plugin management (scaffold and inspection)
+    Plugins {
+        #[command(subcommand)]
+        command: PluginCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum PluginCommands {
+    /// List configured analyzer/optimizer plugins
+    List {
+        /// Optional explicit manifest path (defaults to PIPELINEX_PLUGIN_MANIFEST)
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+
+    /// Create a starter plugin manifest template
+    Scaffold {
+        /// Path to manifest file to create
+        #[arg(default_value = ".pipelinex/plugins.json")]
+        path: PathBuf,
+    },
 }
 
 #[tokio::main]
@@ -238,6 +266,7 @@ async fn main() -> Result<()> {
             token,
             format,
         } => cmd_history(&repo, &workflow, runs, token, &format).await,
+        Commands::Plugins { command } => cmd_plugins(command),
     }
 }
 
@@ -663,4 +692,56 @@ async fn cmd_history(
     }
 
     Ok(())
+}
+
+fn cmd_plugins(command: PluginCommands) -> Result<()> {
+    match command {
+        PluginCommands::Scaffold { path } => {
+            plugins::scaffold_manifest(&path)?;
+            println!("Plugin manifest scaffold ready: {}", path.display());
+            Ok(())
+        }
+        PluginCommands::List { manifest, format } => {
+            let loaded = if let Some(path) = manifest {
+                plugins::load_manifest_from_path(path)?
+            } else {
+                plugins::load_manifest_from_env()?.unwrap_or_default()
+            };
+
+            #[derive(serde::Serialize)]
+            struct Output {
+                analyzers: Vec<String>,
+                optimizers: Vec<String>,
+            }
+
+            let output = Output {
+                analyzers: loaded.analyzers.iter().map(|p| p.id.clone()).collect(),
+                optimizers: loaded.optimizers.iter().map(|p| p.id.clone()).collect(),
+            };
+
+            if format == "json" {
+                println!("{}", serde_json::to_string_pretty(&output)?);
+            } else {
+                println!("Analyzer plugins:");
+                if output.analyzers.is_empty() {
+                    println!("  (none)");
+                } else {
+                    for id in output.analyzers {
+                        println!("  - {}", id);
+                    }
+                }
+
+                println!("Optimizer plugins:");
+                if output.optimizers.is_empty() {
+                    println!("  (none)");
+                } else {
+                    for id in output.optimizers {
+                        println!("  - {}", id);
+                    }
+                }
+            }
+
+            Ok(())
+        }
+    }
 }

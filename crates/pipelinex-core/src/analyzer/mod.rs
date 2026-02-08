@@ -30,6 +30,9 @@ pub fn analyze(dag: &PipelineDag) -> AnalysisReport {
     // Waste detection
     findings.extend(waste_detector::detect_waste(dag));
 
+    // Optional external analyzer plugins (manifest-driven).
+    findings.extend(crate::plugins::run_external_analyzer_plugins(dag));
+
     // Sort findings by severity (critical first)
     findings.sort_by_key(|f| std::cmp::Reverse(f.severity.priority()));
 

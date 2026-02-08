@@ -5,6 +5,7 @@ pub mod graph;
 pub mod health_score;
 pub mod optimizer;
 pub mod parser;
+pub mod plugins;
 pub mod providers;
 pub mod simulator;
 pub mod test_selector;
@@ -21,4 +22,7 @@ pub use parser::dag::{DagEdge, JobNode, PipelineDag, StepInfo};
 pub use parser::github::GitHubActionsParser;
 pub use parser::gitlab::GitLabCIParser;
 pub use parser::jenkins::JenkinsParser;
+pub use plugins::{
+    list_external_optimizer_plugins, run_external_analyzer_plugins, scaffold_manifest,
+};
 pub use test_selector::{TestSelection, TestSelector, TestSelectorConfig};

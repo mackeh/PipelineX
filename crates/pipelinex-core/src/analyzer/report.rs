@@ -57,6 +57,7 @@ pub enum FindingCategory {
     FlakyTest,
     ConcurrencyControl,
     ArtifactReuse,
+    CustomPlugin,
 }
 
 impl FindingCategory {
@@ -73,6 +74,7 @@ impl FindingCategory {
             FindingCategory::FlakyTest => "Flaky Test",
             FindingCategory::ConcurrencyControl => "Missing Concurrency Control",
             FindingCategory::ArtifactReuse => "Missing Artifact Reuse",
+            FindingCategory::CustomPlugin => "Custom Plugin",
         }
     }
 }
