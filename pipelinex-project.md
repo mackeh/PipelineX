@@ -801,13 +801,13 @@ pipelinex/
 - [ ] VS Code extension with inline workflow optimization hints
 - [ ] Community benchmark registry (anonymized — "your pipeline vs. similar projects")
 - [ ] Optimization impact tracking ("this change saved X min/month")
-- [ ] Enterprise SSO, RBAC, audit logs
+- [x] Enterprise SSO, RBAC, audit logs
 - [ ] Self-hosted deployment (Docker Compose + Helm chart)
 - [ ] REST API for custom integrations
 - [ ] CI provider migration assistant ("convert GitHub Actions → GitLab CI")
 - [ ] Runner right-sizing recommendations (based on resource profiling)
 - [ ] Multi-repo pipeline analysis (monorepo orchestration detection)
-- [ ] Plugin system for custom analyzers and optimizers
+- [x] Plugin system for custom analyzers and optimizers
 
 ---
 
