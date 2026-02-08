@@ -1,6 +1,7 @@
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
 use pipelinex_core::parser::jenkins::JenkinsParser;
+use pipelinex_core::parser::circleci::CircleCIParser;
 use pipelinex_core::analyzer;
 use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::optimizer::docker_opt;
@@ -29,6 +30,10 @@ fn docker_fixture(name: &str) -> PathBuf {
 
 fn jenkins_fixture(name: &str) -> PathBuf {
     fixtures_dir().join("jenkins").join(name)
+}
+
+fn circleci_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("circleci").join(name)
 }
 
 // ─── GitHub Actions integration tests ───
@@ -290,4 +295,48 @@ fn test_analyze_jenkins_microservices() {
     assert!(report.job_count >= 5);
     // Should detect opportunities for parallelization
     assert!(report.max_parallelism >= 1);
+}
+
+// ─── CircleCI integration tests ───
+
+#[test]
+fn test_analyze_circleci_config() {
+    let path = circleci_fixture("config.yml");
+    let dag = CircleCIParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.provider, "circleci");
+    assert_eq!(report.job_count, 5);
+    assert!(report.max_parallelism >= 2, "lint and test should run in parallel");
+}
+
+#[test]
+fn test_circleci_workflow_dependencies() {
+    let path = circleci_fixture("config.yml");
+    let dag = CircleCIParser::parse_file(&path).unwrap();
+
+    // Verify the workflow dependency chain
+    let deploy_job = dag.get_job("deploy").unwrap();
+    assert_eq!(deploy_job.needs, vec!["build"]);
+
+    let build_job = dag.get_job("build").unwrap();
+    assert!(build_job.needs.contains(&"lint".to_string()));
+    assert!(build_job.needs.contains(&"test".to_string()));
+}
+
+#[test]
+fn test_circleci_detects_bottlenecks() {
+    let path = circleci_fixture("config.yml");
+    let dag = CircleCIParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    // Should detect serial bottlenecks or missing caches
+    assert!(!report.findings.is_empty(), "Should detect optimization opportunities");
+    assert!(
+        report.findings.iter().any(|f| {
+            f.category == pipelinex_core::analyzer::report::FindingCategory::SerialBottleneck
+                || f.category == pipelinex_core::analyzer::report::FindingCategory::MissingCache
+        }),
+        "Should detect bottlenecks or missing caches"
+    );
 }

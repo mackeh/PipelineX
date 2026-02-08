@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
 use pipelinex_core::parser::jenkins::JenkinsParser;
+use pipelinex_core::parser::circleci::CircleCIParser;
 use pipelinex_core::analyzer;
 use pipelinex_core::optimizer::Optimizer;
 use std::path::PathBuf;
@@ -160,6 +161,10 @@ fn parse_pipeline(path: &std::path::Path) -> Result<pipelinex_core::PipelineDag>
     {
         JenkinsParser::parse_file(path)
             .with_context(|| format!("Failed to parse Jenkinsfile: {}", path.display()))
+    } else if path_str.contains("circleci") || path_str.contains(".circleci")
+    {
+        CircleCIParser::parse_file(path)
+            .with_context(|| format!("Failed to parse CircleCI config: {}", path.display()))
     } else {
         // Default to GitHub Actions
         GitHubActionsParser::parse_file(path)

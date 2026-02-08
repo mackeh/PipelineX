@@ -1,0 +1,88 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@5.0
+
+jobs:
+  install:
+    docker:
+      - image: cimg/node:18.0
+    steps:
+      - checkout
+      - node/install-packages:
+          pkg-manager: npm
+      - persist_to_workspace:
+          root: .
+          paths:
+            - node_modules
+
+  lint:
+    docker:
+      - image: cimg/node:18.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Run ESLint
+          command: npm run lint
+
+  test:
+    docker:
+      - image: cimg/node:18.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Run tests
+          command: npm test
+      - store_test_results:
+          path: test-results
+
+  build:
+    docker:
+      - image: cimg/node:18.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Build production bundle
+          command: npm run build
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
+
+  deploy:
+    docker:
+      - image: cimg/node:18.0
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Deploy to production
+          command: npm run deploy
+
+workflows:
+  build-test-deploy:
+    jobs:
+      - install
+      - lint:
+          requires:
+            - install
+      - test:
+          requires:
+            - install
+      - build:
+          requires:
+            - lint
+            - test
+      - deploy:
+          requires:
+            - build
+          filters:
+            branches:
+              only: main
