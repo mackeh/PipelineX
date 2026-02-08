@@ -806,9 +806,9 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 ## 📊 Project Status
 
 - **Phase 1:** ✅ Core engine, GitHub Actions parser, CLI
-- **Phase 2:** ✅ Multi-platform (5 CI systems), simulation, visualization
-- **Phase 3:** 🚧 Platform features in progress (live dashboard + API endpoints started)
-- **Phase 4:** 🚧 In progress (benchmarks, public API hardening, enterprise auth, self-hosted deploy, REST API, VS Code extension, plugin scaffold)
+- **Phase 2:** ✅ Multi-platform (8 CI systems), simulation, visualization
+- **Phase 3:** 🚧 Platform features in progress (dashboard, webhook ingestion, and team-facing APIs shipped)
+- **Phase 4:** 🚧 In progress (benchmarks, public/enterprise API hardening, self-hosted deploy, REST API, VS Code extension, plugin scaffold)
 
 ---
 
