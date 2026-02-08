@@ -1,0 +1,29 @@
+services:
+  pipelinex-dashboard:
+    build:
+      context: .
+      dockerfile: dashboard/Dockerfile
+    image: mackeh/pipelinex-dashboard:latest
+    container_name: pipelinex-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PIPELINEX_REPO_ROOT: /workspace
+      PIPELINEX_PUBLIC_API_RATE_LIMIT_FILE: /data/public-api-rate-limits.json
+      PIPELINEX_PUBLIC_API_AUDIT_LOG_FILE: /data/public-api-audit.log
+      # Optional public API key mode:
+      # PIPELINEX_API_KEY: "replace-me"
+      # PIPELINEX_API_KEY_SCOPES: "benchmarks:read,benchmarks:write"
+      # PIPELINEX_API_KEY_ROLES: "admin"
+      # Optional enterprise auth:
+      # PIPELINEX_ENTERPRISE_SESSION_SECRET: "replace-me"
+      # PIPELINEX_SSO_SHARED_SECRET: "replace-me"
+    volumes:
+      - pipelinex_workspace:/workspace
+      - pipelinex_data:/data
+
+volumes:
+  pipelinex_workspace:
+  pipelinex_data:

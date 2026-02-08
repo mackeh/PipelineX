@@ -6,6 +6,9 @@
 # Build artifacts
 target/
 **/target/
+dashboard/.next/
+dashboard/node_modules/
+*.tar.gz
 
 # IDE
 .vscode/
