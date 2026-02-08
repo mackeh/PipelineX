@@ -409,7 +409,7 @@ mod tests {
     #[test]
     fn test_detect_languages() {
         let selector = TestSelector::new();
-        let files = vec![
+        let files = [
             PathBuf::from("src/main.rs"),
             PathBuf::from("src/lib.rs"),
             PathBuf::from("index.js"),
