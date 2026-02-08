@@ -2,6 +2,7 @@ import { constants } from "node:fs";
 import { access, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { randomUUID } from "node:crypto";
 
 export interface HealthScore {
   total_score: number;
@@ -77,9 +78,45 @@ export interface HistorySnapshot {
   workflow_run_id?: number;
 }
 
+export interface BenchmarkEntry {
+  id: string;
+  schema_version: number;
+  submitted_at: string;
+  source: string;
+  provider: string;
+  job_bucket: string;
+  step_bucket: string;
+  job_count: number;
+  step_count: number;
+  max_parallelism: number;
+  finding_count: number;
+  critical_count: number;
+  high_count: number;
+  medium_count: number;
+  total_duration_secs: number;
+  optimized_duration_secs: number;
+  improvement_pct: number;
+  health_score: number | null;
+}
+
+export interface BenchmarkStats {
+  cohort: "provider+job+step" | "provider" | "global";
+  sample_count: number;
+  provider: string;
+  job_bucket: string;
+  step_bucket: string;
+  duration_median_secs: number;
+  duration_p75_secs: number;
+  optimized_median_secs: number;
+  improvement_median_pct: number;
+  health_score_median: number | null;
+  finding_median: number;
+}
+
 const PIPELINE_EXTENSIONS = [".yml", ".yaml", ".groovy", ".jenkinsfile"];
 const SEARCH_ROOTS = [".github/workflows", "tests/fixtures"];
 const HISTORY_CACHE_RELATIVE_DIR = ".pipelinex/history-cache";
+const BENCHMARK_REGISTRY_RELATIVE_PATH = ".pipelinex/benchmark-registry.json";
 
 function pathExists(filePath: string): Promise<boolean> {
   return access(filePath, constants.F_OK)
@@ -436,4 +473,232 @@ export async function refreshHistorySnapshot(
 
   await writeHistorySnapshot(snapshot);
   return snapshot;
+}
+
+function countBucket(count: number, bounds: number[]): string {
+  if (!Number.isFinite(count) || count <= 0) {
+    return "0";
+  }
+
+  for (let index = 0; index < bounds.length; index += 1) {
+    const upper = bounds[index];
+    const lower = index === 0 ? 1 : bounds[index - 1] + 1;
+    if (count <= upper) {
+      return `${lower}-${upper}`;
+    }
+  }
+
+  return `${bounds[bounds.length - 1] + 1}+`;
+}
+
+function percentile(values: number[], pct: number): number {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const sorted = [...values].sort((a, b) => a - b);
+  const rank = (pct / 100) * (sorted.length - 1);
+  const lower = Math.floor(rank);
+  const upper = Math.ceil(rank);
+
+  if (lower === upper) {
+    return sorted[lower];
+  }
+
+  const weight = rank - lower;
+  return sorted[lower] * (1 - weight) + sorted[upper] * weight;
+}
+
+function median(values: number[]): number {
+  return percentile(values, 50);
+}
+
+function benchmarkRegistryPath(repoRoot: string): string {
+  return path.join(repoRoot, BENCHMARK_REGISTRY_RELATIVE_PATH);
+}
+
+async function readBenchmarkRegistry(): Promise<BenchmarkEntry[]> {
+  const repoRoot = await getRepoRoot();
+  const filePath = benchmarkRegistryPath(repoRoot);
+
+  if (!(await pathExists(filePath))) {
+    return [];
+  }
+
+  const raw = await readFile(filePath, "utf8");
+  if (!raw.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as BenchmarkEntry[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+async function writeBenchmarkRegistry(entries: BenchmarkEntry[]): Promise<void> {
+  const repoRoot = await getRepoRoot();
+  const filePath = benchmarkRegistryPath(repoRoot);
+  const parentDir = path.dirname(filePath);
+  await mkdir(parentDir, { recursive: true });
+
+  // Keep the local registry bounded to avoid unbounded growth.
+  const retained = entries.slice(-2000);
+  await writeFile(filePath, JSON.stringify(retained, null, 2), "utf8");
+}
+
+function buildBenchmarkEntry(report: AnalysisReport, source: string): BenchmarkEntry {
+  const criticalCount = report.findings.filter(
+    (finding) => finding.severity.toLowerCase() === "critical",
+  ).length;
+  const highCount = report.findings.filter(
+    (finding) => finding.severity.toLowerCase() === "high",
+  ).length;
+  const mediumCount = report.findings.filter(
+    (finding) => finding.severity.toLowerCase() === "medium",
+  ).length;
+
+  const improvementPct =
+    ((report.total_estimated_duration_secs - report.optimized_duration_secs) /
+      Math.max(report.total_estimated_duration_secs, 1)) *
+    100;
+
+  return {
+    id: randomUUID(),
+    schema_version: 1,
+    submitted_at: new Date().toISOString(),
+    source,
+    provider: report.provider,
+    job_bucket: countBucket(report.job_count, [5, 10, 20, 40]),
+    step_bucket: countBucket(report.step_count, [20, 50, 100, 200]),
+    job_count: report.job_count,
+    step_count: report.step_count,
+    max_parallelism: report.max_parallelism,
+    finding_count: report.findings.length,
+    critical_count: criticalCount,
+    high_count: highCount,
+    medium_count: mediumCount,
+    total_duration_secs: report.total_estimated_duration_secs,
+    optimized_duration_secs: report.optimized_duration_secs,
+    improvement_pct: Math.max(0, improvementPct),
+    health_score: report.health_score?.total_score ?? null,
+  };
+}
+
+function summarizeBenchmarkStats(
+  entries: BenchmarkEntry[],
+  cohort: BenchmarkStats["cohort"],
+  provider: string,
+  jobBucket: string,
+  stepBucket: string,
+): BenchmarkStats {
+  const durationValues = entries.map((entry) => entry.total_duration_secs);
+  const optimizedValues = entries.map((entry) => entry.optimized_duration_secs);
+  const improvementValues = entries.map((entry) => entry.improvement_pct);
+  const findingValues = entries.map((entry) => entry.finding_count);
+  const healthValues = entries
+    .map((entry) => entry.health_score)
+    .filter((value): value is number => value !== null);
+
+  return {
+    cohort,
+    sample_count: entries.length,
+    provider,
+    job_bucket: jobBucket,
+    step_bucket: stepBucket,
+    duration_median_secs: median(durationValues),
+    duration_p75_secs: percentile(durationValues, 75),
+    optimized_median_secs: median(optimizedValues),
+    improvement_median_pct: median(improvementValues),
+    health_score_median: healthValues.length > 0 ? median(healthValues) : null,
+    finding_median: median(findingValues),
+  };
+}
+
+function cohortEntries(
+  entries: BenchmarkEntry[],
+  provider: string,
+  jobBucket: string,
+  stepBucket: string,
+): { cohort: BenchmarkStats["cohort"]; entries: BenchmarkEntry[] } {
+  const exact = entries.filter(
+    (entry) =>
+      entry.provider === provider &&
+      entry.job_bucket === jobBucket &&
+      entry.step_bucket === stepBucket,
+  );
+
+  if (exact.length >= 5) {
+    return { cohort: "provider+job+step", entries: exact };
+  }
+
+  const providerOnly = entries.filter((entry) => entry.provider === provider);
+  if (providerOnly.length >= 5) {
+    return { cohort: "provider", entries: providerOnly };
+  }
+
+  return { cohort: "global", entries };
+}
+
+interface BenchmarkQuery {
+  provider: string;
+  jobCount: number;
+  stepCount: number;
+}
+
+export async function queryBenchmarkStats(
+  query: BenchmarkQuery,
+): Promise<BenchmarkStats | null> {
+  const provider = query.provider.trim();
+  if (!provider) {
+    throw new Error("provider is required.");
+  }
+
+  const jobBucket = countBucket(query.jobCount, [5, 10, 20, 40]);
+  const stepBucket = countBucket(query.stepCount, [20, 50, 100, 200]);
+  const entries = await readBenchmarkRegistry();
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const { cohort, entries: matching } = cohortEntries(
+    entries,
+    provider,
+    jobBucket,
+    stepBucket,
+  );
+
+  if (matching.length === 0) {
+    return null;
+  }
+
+  return summarizeBenchmarkStats(matching, cohort, provider, jobBucket, stepBucket);
+}
+
+export async function submitBenchmarkReport(
+  report: AnalysisReport,
+  source = "dashboard",
+): Promise<{ entry: BenchmarkEntry; stats: BenchmarkStats }> {
+  const entry = buildBenchmarkEntry(report, source);
+  const entries = await readBenchmarkRegistry();
+  entries.push(entry);
+  await writeBenchmarkRegistry(entries);
+
+  const stats = await queryBenchmarkStats({
+    provider: entry.provider,
+    jobCount: entry.job_count,
+    stepCount: entry.step_count,
+  });
+
+  if (!stats) {
+    throw new Error("Failed to compute benchmark stats after submission.");
+  }
+
+  return { entry, stats };
 }
