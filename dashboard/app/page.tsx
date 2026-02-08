@@ -25,7 +25,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { AnalysisReport, Finding } from "@/lib/pipelinex";
+import type { AnalysisReport, Finding, HistorySnapshot } from "@/lib/pipelinex";
 
 type WorkflowsResponse = {
   files?: string[];
@@ -34,6 +34,11 @@ type WorkflowsResponse = {
 
 type AnalyzeResponse = {
   report?: AnalysisReport;
+  error?: string;
+};
+
+type HistoryListResponse = {
+  snapshots?: HistorySnapshot[];
   error?: string;
 };
 
@@ -69,6 +74,8 @@ export default function DashboardPage() {
   const [report, setReport] = useState<AnalysisReport | null>(null);
   const [loadingWorkflows, setLoadingWorkflows] = useState(true);
   const [runningAnalysis, setRunningAnalysis] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historySnapshots, setHistorySnapshots] = useState<HistorySnapshot[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
@@ -100,6 +107,26 @@ export default function DashboardPage() {
       );
     } finally {
       setRunningAnalysis(false);
+    }
+  }, []);
+
+  const loadHistorySnapshots = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const response = await fetch("/api/history");
+      const payload = (await response.json()) as HistoryListResponse;
+      if (!response.ok || !payload.snapshots) {
+        throw new Error(payload.error || "Failed to load history snapshots.");
+      }
+      setHistorySnapshots(payload.snapshots.slice(0, 6));
+    } catch (historyError) {
+      setError(
+        historyError instanceof Error
+          ? historyError.message
+          : "Failed to load history snapshot list.",
+      );
+    } finally {
+      setLoadingHistory(false);
     }
   }, []);
 
@@ -142,11 +169,12 @@ export default function DashboardPage() {
     };
 
     void loadWorkflows();
+    void loadHistorySnapshots();
 
     return () => {
       mounted = false;
     };
-  }, [runAnalysis]);
+  }, [loadHistorySnapshots, runAnalysis]);
 
   const severityCounts = useMemo(() => {
     const counts = {
@@ -387,6 +415,46 @@ export default function DashboardPage() {
                       </li>
                     )}
                   </ul>
+                </Panel>
+              </section>
+
+              <section className="mt-5">
+                <Panel title="Webhook History Cache">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-sm text-zinc-400">
+                      Recent snapshots refreshed by GitHub webhook events.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void loadHistorySnapshots()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:border-cyan-400 hover:text-cyan-200"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${loadingHistory ? "animate-spin" : ""}`} />
+                      Refresh
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    {historySnapshots.map((snapshot) => (
+                      <article
+                        key={`${snapshot.repo}-${snapshot.workflow}-${snapshot.refreshed_at}`}
+                        className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3"
+                      >
+                        <p className="text-sm font-semibold text-zinc-100">{snapshot.repo}</p>
+                        <p className="text-xs text-zinc-400">{snapshot.workflow}</p>
+                        <div className="mt-2 flex flex-wrap gap-3 text-xs text-zinc-300">
+                          <span>Runs: {snapshot.stats.total_runs}</span>
+                          <span>Success: {percentage(snapshot.stats.success_rate * 100)}</span>
+                          <span>Avg: {formatDuration(snapshot.stats.avg_duration_sec)}</span>
+                          <span>Updated: {new Date(snapshot.refreshed_at).toLocaleString()}</span>
+                        </div>
+                      </article>
+                    ))}
+                    {!loadingHistory && historySnapshots.length === 0 && (
+                      <p className="text-sm text-zinc-400">
+                        No cached history yet. Send a `workflow_run` webhook to populate this panel.
+                      </p>
+                    )}
+                  </div>
                 </Panel>
               </section>
             </>

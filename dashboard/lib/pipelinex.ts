@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, readdir, stat } from "node:fs/promises";
+import { access, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
@@ -42,8 +42,44 @@ export interface AnalysisReport {
   health_score: HealthScore | null;
 }
 
+export interface JobTimingData {
+  job_name: string;
+  durations_sec: number[];
+  success_count: number;
+  failure_count: number;
+  avg_duration_sec: number;
+  p50_duration_sec: number;
+  p90_duration_sec: number;
+  p99_duration_sec: number;
+  variance: number;
+}
+
+export interface PipelineStatistics {
+  workflow_name: string;
+  total_runs: number;
+  success_rate: number;
+  avg_duration_sec: number;
+  p50_duration_sec: number;
+  p90_duration_sec: number;
+  p99_duration_sec: number;
+  job_timings: JobTimingData[];
+  flaky_jobs: string[];
+}
+
+export interface HistorySnapshot {
+  repo: string;
+  workflow: string;
+  runs: number;
+  refreshed_at: string;
+  source: "manual" | "webhook";
+  stats: PipelineStatistics;
+  delivery_id?: string;
+  workflow_run_id?: number;
+}
+
 const PIPELINE_EXTENSIONS = [".yml", ".yaml", ".groovy", ".jenkinsfile"];
 const SEARCH_ROOTS = [".github/workflows", "tests/fixtures"];
+const HISTORY_CACHE_RELATIVE_DIR = ".pipelinex/history-cache";
 
 function pathExists(filePath: string): Promise<boolean> {
   return access(filePath, constants.F_OK)
@@ -217,18 +253,25 @@ function runCommand(
   });
 }
 
-export async function analyzePipelineFile(inputPath: string): Promise<AnalysisReport> {
+async function runPipelinexJsonCommand(
+  commandSuffix: string[],
+  timeoutMs = 120_000,
+): Promise<string> {
   const repoRoot = await getRepoRoot();
-  const absolutePath = await resolveRepoPath(inputPath);
   const commandPrefix = await findPipelinexCommand(repoRoot);
-  const fullCommand = [
-    ...commandPrefix,
+  const command = [...commandPrefix, ...commandSuffix];
+  const { stdout } = await runCommand(command, repoRoot, timeoutMs);
+  return stdout;
+}
+
+export async function analyzePipelineFile(inputPath: string): Promise<AnalysisReport> {
+  const absolutePath = await resolveRepoPath(inputPath);
+  const stdout = await runPipelinexJsonCommand([
     "analyze",
     absolutePath,
     "--format",
     "json",
-  ];
-  const { stdout } = await runCommand(fullCommand, repoRoot);
+  ]);
 
   try {
     return JSON.parse(stdout) as AnalysisReport;
@@ -240,4 +283,157 @@ export async function analyzePipelineFile(inputPath: string): Promise<AnalysisRe
       }\nOutput preview:\n${preview}`,
     );
   }
+}
+
+function validateRepoFullName(repo: string): void {
+  if (!repo || repo.trim().length === 0) {
+    throw new Error("repo is required in owner/repo format.");
+  }
+
+  const parts = repo.split("/");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    throw new Error("repo must be in owner/repo format.");
+  }
+}
+
+function normalizeWorkflow(workflow: string): string {
+  if (!workflow || workflow.trim().length === 0) {
+    throw new Error("workflow is required.");
+  }
+  return workflow.trim();
+}
+
+function historyCacheFileName(repo: string, workflow: string): string {
+  const safeRepo = encodeURIComponent(repo);
+  const safeWorkflow = encodeURIComponent(workflow);
+  return `${safeRepo}__${safeWorkflow}.json`;
+}
+
+async function historyCacheDir(): Promise<string> {
+  const repoRoot = await getRepoRoot();
+  return path.join(repoRoot, HISTORY_CACHE_RELATIVE_DIR);
+}
+
+async function historyCacheFilePath(repo: string, workflow: string): Promise<string> {
+  const cacheDir = await historyCacheDir();
+  return path.join(cacheDir, historyCacheFileName(repo, workflow));
+}
+
+async function writeHistorySnapshot(snapshot: HistorySnapshot): Promise<void> {
+  const cacheDir = await historyCacheDir();
+  await mkdir(cacheDir, { recursive: true });
+  const cachePath = await historyCacheFilePath(snapshot.repo, snapshot.workflow);
+  await writeFile(cachePath, JSON.stringify(snapshot, null, 2), "utf8");
+}
+
+export async function readHistorySnapshot(
+  repo: string,
+  workflow: string,
+): Promise<HistorySnapshot | null> {
+  validateRepoFullName(repo);
+  const normalizedWorkflow = normalizeWorkflow(workflow);
+  const cachePath = await historyCacheFilePath(repo, normalizedWorkflow);
+  const exists = await pathExists(cachePath);
+
+  if (!exists) {
+    return null;
+  }
+
+  const raw = await readFile(cachePath, "utf8");
+  return JSON.parse(raw) as HistorySnapshot;
+}
+
+export async function listHistorySnapshots(): Promise<HistorySnapshot[]> {
+  const cacheDir = await historyCacheDir();
+  const exists = await pathExists(cacheDir);
+  if (!exists) {
+    return [];
+  }
+
+  const files = await readdir(cacheDir, { withFileTypes: true });
+  const snapshots: HistorySnapshot[] = [];
+
+  for (const entry of files) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) {
+      continue;
+    }
+
+    const filePath = path.join(cacheDir, entry.name);
+    try {
+      const raw = await readFile(filePath, "utf8");
+      snapshots.push(JSON.parse(raw) as HistorySnapshot);
+    } catch {
+      // Ignore malformed cache entries.
+    }
+  }
+
+  snapshots.sort((a, b) => {
+    const left = new Date(a.refreshed_at).getTime();
+    const right = new Date(b.refreshed_at).getTime();
+    return right - left;
+  });
+
+  return snapshots;
+}
+
+interface RefreshHistoryOptions {
+  repo: string;
+  workflow: string;
+  runs?: number;
+  token?: string;
+  source?: "manual" | "webhook";
+  deliveryId?: string;
+  workflowRunId?: number;
+}
+
+export async function refreshHistorySnapshot(
+  options: RefreshHistoryOptions,
+): Promise<HistorySnapshot> {
+  validateRepoFullName(options.repo);
+  const workflow = normalizeWorkflow(options.workflow);
+  const runs = options.runs && options.runs > 0 ? options.runs : 100;
+
+  const command = [
+    "history",
+    "--repo",
+    options.repo,
+    "--workflow",
+    workflow,
+    "--runs",
+    String(runs),
+    "--format",
+    "json",
+  ];
+
+  if (options.token && options.token.trim().length > 0) {
+    command.push("--token", options.token.trim());
+  }
+
+  const stdout = await runPipelinexJsonCommand(command, 180_000);
+  let stats: PipelineStatistics;
+
+  try {
+    stats = JSON.parse(stdout) as PipelineStatistics;
+  } catch (error) {
+    const preview = stdout.slice(0, 4000);
+    throw new Error(
+      `Failed to parse history JSON output: ${
+        error instanceof Error ? error.message : "Unknown parse error"
+      }\nOutput preview:\n${preview}`,
+    );
+  }
+
+  const snapshot: HistorySnapshot = {
+    repo: options.repo,
+    workflow,
+    runs,
+    refreshed_at: new Date().toISOString(),
+    source: options.source ?? "manual",
+    stats,
+    delivery_id: options.deliveryId,
+    workflow_run_id: options.workflowRunId,
+  };
+
+  await writeHistorySnapshot(snapshot);
+  return snapshot;
 }
