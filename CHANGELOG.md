@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Runner right-sizing recommendations (based on resource profiling)
 - Multi-repo pipeline analysis (monorepo orchestration detection)
 
+## [1.2.0] - 2026-02-08
+
+### Added
+- **Optimization impact tracking** with monthly savings calculations persisted to `.pipelinex/optimization-impact-registry.json`.
+- New dashboard endpoints for impact tracking:
+  - `POST /api/impact/track`
+  - `GET /api/impact/stats`
+- New public API endpoints for impact tracking:
+  - `POST /api/public/v1/impact/track`
+  - `GET /api/public/v1/impact/stats`
+- Public OpenAPI descriptor now includes impact tracking paths.
+
+### Changed
+- Public and enterprise auth scope models now include `impact:read` and `impact:write`.
+- Benchmark submission endpoints can optionally auto-record optimization impact when `runsPerMonth` is provided (or defaulted via `PIPELINEX_IMPACT_DEFAULT_RUNS_PER_MONTH`).
+- Updated docs for REST API, dashboard API, self-hosted configuration, and roadmap phase status.
+
 ## [1.1.0] - 2026-02-08
 
 ### Added
@@ -136,5 +153,6 @@ See [GitHub Issues](https://github.com/mackeh/PipelineX/issues) for planned feat
 
 ---
 
+[1.2.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.2.0
 [1.1.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.1.0
 [1.0.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.0.0
