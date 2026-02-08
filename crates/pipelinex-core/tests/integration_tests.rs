@@ -1,5 +1,6 @@
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
+use pipelinex_core::parser::jenkins::JenkinsParser;
 use pipelinex_core::analyzer;
 use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::optimizer::docker_opt;
@@ -24,6 +25,10 @@ fn gitlab_fixture(name: &str) -> PathBuf {
 
 fn docker_fixture(name: &str) -> PathBuf {
     fixtures_dir().join("dockerfiles").join(name)
+}
+
+fn jenkins_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("jenkins").join(name)
 }
 
 // ─── GitHub Actions integration tests ───
@@ -253,4 +258,36 @@ fn test_docker_analyze_go() {
         analysis.findings.iter().any(|f| f.title.contains("multi-stage")),
         "Should recommend multi-stage build for Go"
     );
+}
+
+// ─── Jenkins integration tests ───
+
+#[test]
+fn test_analyze_jenkins_simple() {
+    let path = jenkins_fixture("simple-pipeline.jenkinsfile");
+    let dag = JenkinsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.provider, "jenkins");
+    assert!(report.job_count >= 3);
+}
+
+#[test]
+fn test_analyze_jenkins_parallel() {
+    let path = jenkins_fixture("parallel-pipeline.jenkinsfile");
+    let dag = JenkinsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert!(report.job_count >= 5);
+}
+
+#[test]
+fn test_analyze_jenkins_microservices() {
+    let path = jenkins_fixture("microservices-pipeline.jenkinsfile");
+    let dag = JenkinsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert!(report.job_count >= 5);
+    // Should detect opportunities for parallelization
+    assert!(report.max_parallelism >= 1);
 }

@@ -1,0 +1,50 @@
+pipeline {
+    agent any
+
+    environment {
+        MAVEN_OPTS = '-Xmx2048m'
+        BUILD_VERSION = '1.0.0'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git branch: 'main', url: 'https://github.com/example/project.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean package -DskipTests'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                sh 'kubectl apply -f deployment.yaml'
+            }
+        }
+    }
+
+    post {
+        always {
+            junit '**/target/surefire-reports/*.xml'
+            cleanWs()
+        }
+        success {
+            slackSend channel: '#builds', message: "Build succeeded: ${env.JOB_NAME}"
+        }
+        failure {
+            slackSend channel: '#builds', message: "Build failed: ${env.JOB_NAME}"
+        }
+    }
+}

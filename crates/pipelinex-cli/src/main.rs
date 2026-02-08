@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
+use pipelinex_core::parser::jenkins::JenkinsParser;
 use pipelinex_core::analyzer;
 use pipelinex_core::optimizer::Optimizer;
 use std::path::PathBuf;
@@ -154,6 +155,11 @@ fn parse_pipeline(path: &std::path::Path) -> Result<pipelinex_core::PipelineDag>
     {
         GitLabCIParser::parse_file(path)
             .with_context(|| format!("Failed to parse GitLab CI file: {}", path.display()))
+    } else if filename == "Jenkinsfile" || filename.ends_with(".jenkinsfile")
+        || filename.ends_with(".groovy") || path_str.contains("jenkins")
+    {
+        JenkinsParser::parse_file(path)
+            .with_context(|| format!("Failed to parse Jenkinsfile: {}", path.display()))
     } else {
         // Default to GitHub Actions
         GitHubActionsParser::parse_file(path)

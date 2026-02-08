@@ -1,0 +1,100 @@
+pipeline {
+    agent none
+
+    environment {
+        DOCKER_REGISTRY = 'registry.example.com'
+        NAMESPACE = 'production'
+    }
+
+    stages {
+        stage('Checkout') {
+            agent any
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build Services') {
+            parallel {
+                stage('API Gateway') {
+                    agent {
+                        docker 'gradle:7-jdk17'
+                    }
+                    steps {
+                        sh 'cd services/api-gateway && gradle build'
+                        sh 'docker build -t ${DOCKER_REGISTRY}/api-gateway:${BUILD_NUMBER} services/api-gateway'
+                    }
+                }
+
+                stage('User Service') {
+                    agent {
+                        docker 'gradle:7-jdk17'
+                    }
+                    steps {
+                        sh 'cd services/user-service && gradle build'
+                        sh 'docker build -t ${DOCKER_REGISTRY}/user-service:${BUILD_NUMBER} services/user-service'
+                    }
+                }
+
+                stage('Order Service') {
+                    agent {
+                        docker 'gradle:7-jdk17'
+                    }
+                    steps {
+                        sh 'cd services/order-service && gradle build'
+                        sh 'docker build -t ${DOCKER_REGISTRY}/order-service:${BUILD_NUMBER} services/order-service'
+                    }
+                }
+
+                stage('Payment Service') {
+                    agent {
+                        docker 'gradle:7-jdk17'
+                    }
+                    steps {
+                        sh 'cd services/payment-service && gradle build'
+                        sh 'docker build -t ${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER} services/payment-service'
+                    }
+                }
+
+                stage('Notification Service') {
+                    agent {
+                        docker 'node:18'
+                    }
+                    steps {
+                        sh 'cd services/notification-service && npm ci'
+                        sh 'cd services/notification-service && npm run build'
+                        sh 'docker build -t ${DOCKER_REGISTRY}/notification-service:${BUILD_NUMBER} services/notification-service'
+                    }
+                }
+            }
+        }
+
+        stage('Push Images') {
+            agent any
+            steps {
+                sh 'docker push ${DOCKER_REGISTRY}/api-gateway:${BUILD_NUMBER}'
+                sh 'docker push ${DOCKER_REGISTRY}/user-service:${BUILD_NUMBER}'
+                sh 'docker push ${DOCKER_REGISTRY}/order-service:${BUILD_NUMBER}'
+                sh 'docker push ${DOCKER_REGISTRY}/payment-service:${BUILD_NUMBER}'
+                sh 'docker push ${DOCKER_REGISTRY}/notification-service:${BUILD_NUMBER}'
+            }
+        }
+
+        stage('Integration Tests') {
+            agent any
+            steps {
+                sh 'docker-compose -f docker-compose.test.yml up --abort-on-container-exit'
+            }
+        }
+
+        stage('Deploy') {
+            agent any
+            when {
+                branch 'main'
+            }
+            steps {
+                sh 'helm upgrade --install microservices ./charts/microservices --set image.tag=${BUILD_NUMBER} --namespace ${NAMESPACE}'
+            }
+        }
+    }
+}

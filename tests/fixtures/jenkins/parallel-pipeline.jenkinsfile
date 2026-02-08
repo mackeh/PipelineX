@@ -1,0 +1,119 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'npm ci'
+                sh 'npm run build'
+            }
+        }
+
+        stage('Test') {
+            parallel {
+                stage('Unit Tests') {
+                    agent {
+                        docker {
+                            image 'node:18-alpine'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh 'npm run test:unit'
+                    }
+                }
+
+                stage('Integration Tests') {
+                    agent {
+                        docker {
+                            image 'node:18-alpine'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh 'npm run test:integration'
+                    }
+                }
+
+                stage('E2E Tests') {
+                    agent {
+                        docker {
+                            image 'mcr.microsoft.com/playwright:latest'
+                            reuseNode true
+                        }
+                    }
+                    steps {
+                        sh 'npm run test:e2e'
+                    }
+                }
+            }
+        }
+
+        stage('Quality Gates') {
+            parallel {
+                stage('Code Coverage') {
+                    steps {
+                        sh 'npm run coverage'
+                    }
+                }
+
+                stage('Security Scan') {
+                    steps {
+                        sh 'npm audit --production'
+                    }
+                }
+
+                stage('Lint') {
+                    steps {
+                        sh 'npm run lint'
+                    }
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                sh 'docker build -t myapp:${BUILD_NUMBER} .'
+            }
+        }
+
+        stage('Deploy to Staging') {
+            when {
+                branch 'develop'
+            }
+            steps {
+                sh 'kubectl set image deployment/myapp myapp=myapp:${BUILD_NUMBER} -n staging'
+            }
+        }
+
+        stage('Deploy to Production') {
+            when {
+                branch 'main'
+            }
+            steps {
+                input message: 'Deploy to production?', ok: 'Deploy'
+                sh 'kubectl set image deployment/myapp myapp=myapp:${BUILD_NUMBER} -n production'
+            }
+        }
+    }
+
+    post {
+        always {
+            junit '**/junit.xml'
+            publishHTML([
+                allowMissing: false,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'coverage',
+                reportFiles: 'index.html',
+                reportName: 'Coverage Report'
+            ])
+        }
+    }
+}

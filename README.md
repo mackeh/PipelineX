@@ -2,7 +2,7 @@
 
 **Your pipelines are slow. PipelineX knows why — and fixes them automatically.**
 
-PipelineX is an intelligent CI/CD analysis tool that reads your pipeline configurations, identifies exactly where time and money are wasted, and generates optimized configurations. It works offline, requires no account, and supports **GitHub Actions** and **GitLab CI** with more platforms planned.
+PipelineX is an intelligent CI/CD analysis tool that reads your pipeline configurations, identifies exactly where time and money are wasted, and generates optimized configurations. It works offline, requires no account, and supports **GitHub Actions**, **GitLab CI**, and **Jenkins** with more platforms planned.
 
 [![CI](https://github.com/mackeh/PipelineX/actions/workflows/ci.yml/badge.svg)](https://github.com/mackeh/PipelineX/actions/workflows/ci.yml)
 
@@ -238,7 +238,8 @@ PipelineX/
 │   │   │   ├── parser/              # Pipeline config parsers
 │   │   │   │   ├── dag.rs           # Unified Pipeline DAG data model
 │   │   │   │   ├── github.rs        # GitHub Actions parser
-│   │   │   │   └── gitlab.rs        # GitLab CI parser
+│   │   │   │   ├── gitlab.rs        # GitLab CI parser
+│   │   │   │   └── jenkins.rs       # Jenkins (Jenkinsfile) parser
 │   │   │   ├── analyzer/            # Bottleneck detection
 │   │   │   │   ├── critical_path.rs # Critical path analysis (longest path)
 │   │   │   │   ├── cache_detector.rs# Missing dependency cache detection
@@ -264,6 +265,7 @@ PipelineX/
 │   └── fixtures/
 │       ├── github-actions/          # 8 GitHub Actions workflow samples
 │       ├── gitlab-ci/               # 3 GitLab CI pipeline samples
+│       ├── jenkins/                 # 3 Jenkins pipeline samples
 │       └── dockerfiles/             # 4 Dockerfile samples
 ├── .github/
 │   └── workflows/
@@ -288,14 +290,15 @@ PipelineX/
 
 ### Phase 2 (Complete)
 - [x] GitLab CI parser (stages, needs, parallel keyword, rules, hidden jobs)
+- [x] Jenkins parser (declarative pipelines, stages, parallel, Docker agents)
 - [x] Monte Carlo simulation engine (xorshift64 RNG, per-job stats, histograms)
 - [x] Pipeline DAG visualization (Mermaid, Graphviz DOT, ASCII)
 - [x] Dockerfile analysis and optimization (multi-stage builds, cache busting, base images)
 - [x] Matrix/shard optimizer (combinatorial explosion reduction, smart test sharding)
 - [x] SARIF 2.1.0 output for GitHub Code Scanning / IDE integration
 - [x] GitHub Actions CI pipeline for PipelineX itself
-- [x] 40 tests (23 unit + 17 integration) across all modules
-- [x] 15 test fixtures (GitHub Actions, GitLab CI, Dockerfiles)
+- [x] 47 tests (27 unit + 20 integration) across all modules
+- [x] 18 test fixtures (GitHub Actions, GitLab CI, Jenkins, Dockerfiles)
 
 ### Phase 3 (Planned)
 - [ ] GitHub API integration for historical run data
@@ -319,7 +322,7 @@ PipelineX/
 |---|---|
 | GitHub Actions | Supported |
 | GitLab CI | Supported |
-| Jenkins | Planned |
+| Jenkins | Supported |
 | Bitbucket Pipelines | Planned |
 | CircleCI | Planned |
 | Azure Pipelines | Planned |
