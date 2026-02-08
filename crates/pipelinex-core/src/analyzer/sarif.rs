@@ -5,12 +5,16 @@ use serde_json::json;
 /// SARIF (Static Analysis Results Interchange Format) is consumed by
 /// GitHub Code Scanning, VS Code, and other tools.
 pub fn to_sarif(report: &AnalysisReport) -> serde_json::Value {
-    let rules: Vec<serde_json::Value> = report.findings.iter()
+    let rules: Vec<serde_json::Value> = report
+        .findings
+        .iter()
         .enumerate()
         .map(|(i, f)| sarif_rule(i, f))
         .collect();
 
-    let results: Vec<serde_json::Value> = report.findings.iter()
+    let results: Vec<serde_json::Value> = report
+        .findings
+        .iter()
         .enumerate()
         .map(|(i, f)| sarif_result(i, f, &report.source_file))
         .collect();
@@ -101,19 +105,24 @@ fn sarif_result(index: usize, finding: &Finding, source_file: &str) -> serde_jso
 
     if !finding.affected_jobs.is_empty() {
         result["relatedLocations"] = serde_json::Value::Array(
-            finding.affected_jobs.iter().enumerate().map(|(i, job)| {
-                json!({
-                    "id": i,
-                    "message": {
-                        "text": format!("Affected job: {}", job),
-                    },
-                    "physicalLocation": {
-                        "artifactLocation": {
-                            "uri": source_file,
+            finding
+                .affected_jobs
+                .iter()
+                .enumerate()
+                .map(|(i, job)| {
+                    json!({
+                        "id": i,
+                        "message": {
+                            "text": format!("Affected job: {}", job),
+                        },
+                        "physicalLocation": {
+                            "artifactLocation": {
+                                "uri": source_file,
+                            }
                         }
-                    }
+                    })
                 })
-            }).collect()
+                .collect(),
         );
     }
 
@@ -123,8 +132,8 @@ fn sarif_result(index: usize, finding: &Finding, source_file: &str) -> serde_jso
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::github::GitHubActionsParser;
     use crate::analyzer;
+    use crate::parser::github::GitHubActionsParser;
 
     #[test]
     fn test_sarif_output_is_valid() {

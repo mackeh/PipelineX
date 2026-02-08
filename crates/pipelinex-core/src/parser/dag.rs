@@ -116,9 +116,13 @@ impl PipelineDag {
 
     /// Add a dependency edge between two jobs.
     pub fn add_dependency(&mut self, from_id: &str, to_id: &str) -> anyhow::Result<()> {
-        let from_idx = self.node_map.get(from_id)
+        let from_idx = self
+            .node_map
+            .get(from_id)
             .ok_or_else(|| anyhow::anyhow!("Job '{}' not found in DAG", from_id))?;
-        let to_idx = self.node_map.get(to_id)
+        let to_idx = self
+            .node_map
+            .get(to_id)
             .ok_or_else(|| anyhow::anyhow!("Job '{}' not found in DAG", to_id))?;
         self.graph.add_edge(*from_idx, *to_idx, DagEdge::Dependency);
         Ok(())
@@ -126,18 +130,26 @@ impl PipelineDag {
 
     /// Get all root jobs (jobs with no dependencies).
     pub fn root_jobs(&self) -> Vec<NodeIndex> {
-        self.graph.node_indices()
+        self.graph
+            .node_indices()
             .filter(|&idx| {
-                self.graph.neighbors_directed(idx, Direction::Incoming).count() == 0
+                self.graph
+                    .neighbors_directed(idx, Direction::Incoming)
+                    .count()
+                    == 0
             })
             .collect()
     }
 
     /// Get all leaf jobs (jobs that nothing depends on).
     pub fn leaf_jobs(&self) -> Vec<NodeIndex> {
-        self.graph.node_indices()
+        self.graph
+            .node_indices()
             .filter(|&idx| {
-                self.graph.neighbors_directed(idx, Direction::Outgoing).count() == 0
+                self.graph
+                    .neighbors_directed(idx, Direction::Outgoing)
+                    .count()
+                    == 0
             })
             .collect()
     }
@@ -184,13 +196,21 @@ impl PipelineDag {
         level_counts.into_iter().max().unwrap_or(0)
     }
 
-    fn compute_levels(&self, node: NodeIndex, level: usize, levels: &mut HashMap<NodeIndex, usize>) {
+    fn compute_levels(
+        &self,
+        node: NodeIndex,
+        level: usize,
+        levels: &mut HashMap<NodeIndex, usize>,
+    ) {
         let current = levels.entry(node).or_insert(0);
         if level > *current {
             *current = level;
         }
         let level = *levels.get(&node).unwrap();
-        let neighbors: Vec<_> = self.graph.neighbors_directed(node, Direction::Outgoing).collect();
+        let neighbors: Vec<_> = self
+            .graph
+            .neighbors_directed(node, Direction::Outgoing)
+            .collect();
         for neighbor in neighbors {
             self.compute_levels(neighbor, level + 1, levels);
         }

@@ -1,10 +1,10 @@
-pub mod critical_path;
 pub mod cache_detector;
+pub mod critical_path;
+pub mod html_report;
 pub mod parallel_finder;
-pub mod waste_detector;
 pub mod report;
 pub mod sarif;
-pub mod html_report;
+pub mod waste_detector;
 
 use crate::parser::dag::PipelineDag;
 use report::{AnalysisReport, Finding};
@@ -15,7 +15,11 @@ pub fn analyze(dag: &PipelineDag) -> AnalysisReport {
 
     // Critical path analysis
     let (critical_path, critical_path_duration) = critical_path::find_critical_path(dag);
-    findings.extend(critical_path::analyze_critical_path(dag, &critical_path, critical_path_duration));
+    findings.extend(critical_path::analyze_critical_path(
+        dag,
+        &critical_path,
+        critical_path_duration,
+    ));
 
     // Cache detection
     findings.extend(cache_detector::detect_missing_caches(dag));
@@ -33,9 +37,18 @@ pub fn analyze(dag: &PipelineDag) -> AnalysisReport {
     let estimated_optimized = estimate_optimized_duration(&findings, total_duration);
 
     // Calculate health score
-    let critical_count = findings.iter().filter(|f| f.severity == report::Severity::Critical).count();
-    let high_count = findings.iter().filter(|f| f.severity == report::Severity::High).count();
-    let medium_count = findings.iter().filter(|f| f.severity == report::Severity::Medium).count();
+    let critical_count = findings
+        .iter()
+        .filter(|f| f.severity == report::Severity::Critical)
+        .count();
+    let high_count = findings
+        .iter()
+        .filter(|f| f.severity == report::Severity::High)
+        .count();
+    let medium_count = findings
+        .iter()
+        .filter(|f| f.severity == report::Severity::Medium)
+        .count();
 
     let calculator = crate::health_score::HealthScoreCalculator::new();
     let health_score = calculator.calculate(
@@ -67,11 +80,14 @@ pub fn analyze(dag: &PipelineDag) -> AnalysisReport {
 
 fn detect_has_caching(findings: &[report::Finding]) -> bool {
     // If no "Missing Cache" findings, assume caching is present
-    !findings.iter().any(|f| matches!(f.category, report::FindingCategory::MissingCache))
+    !findings
+        .iter()
+        .any(|f| matches!(f.category, report::FindingCategory::MissingCache))
 }
 
 fn estimate_optimized_duration(findings: &[Finding], current_duration: f64) -> f64 {
-    let total_savings: f64 = findings.iter()
+    let total_savings: f64 = findings
+        .iter()
         .filter_map(|f| f.estimated_savings_secs)
         .sum();
     // Don't go below 20% of original (there's always some irreducible time)

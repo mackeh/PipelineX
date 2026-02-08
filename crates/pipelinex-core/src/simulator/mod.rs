@@ -46,7 +46,9 @@ struct Rng {
 
 impl Rng {
     fn new(seed: u64) -> Self {
-        Self { state: if seed == 0 { 1 } else { seed } }
+        Self {
+            state: if seed == 0 { 1 } else { seed },
+        }
     }
 
     fn next_u64(&mut self) -> u64 {
@@ -110,17 +112,24 @@ pub fn simulate(dag: &PipelineDag, num_runs: usize, variance_factor: f64) -> Sim
         let mut predecessor: HashMap<NodeIndex, Option<NodeIndex>> = HashMap::new();
 
         for &node in &topo {
-            let deps: Vec<_> = dag.graph.neighbors_directed(node, Direction::Incoming).collect();
-            let start_time = deps.iter()
+            let deps: Vec<_> = dag
+                .graph
+                .neighbors_directed(node, Direction::Incoming)
+                .collect();
+            let start_time = deps
+                .iter()
                 .map(|dep| finish_time.get(dep).copied().unwrap_or(0.0))
                 .fold(0.0f64, f64::max);
 
             let duration = sampled[&node];
             finish_time.insert(node, start_time + duration);
 
-            let pred = deps.iter()
+            let pred = deps
+                .iter()
                 .max_by(|a, b| {
-                    finish_time.get(a).unwrap_or(&0.0)
+                    finish_time
+                        .get(a)
+                        .unwrap_or(&0.0)
                         .partial_cmp(finish_time.get(b).unwrap_or(&0.0))
                         .unwrap()
                 })
@@ -132,13 +141,18 @@ pub fn simulate(dag: &PipelineDag, num_runs: usize, variance_factor: f64) -> Sim
         run_durations.push(total);
 
         // Track which jobs are on the critical path
-        if let Some((&end_node, _)) = finish_time.iter()
+        if let Some((&end_node, _)) = finish_time
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
         {
             let mut current = end_node;
-            job_critical_count.entry(dag.graph[current].id.clone()).and_modify(|c| *c += 1);
+            job_critical_count
+                .entry(dag.graph[current].id.clone())
+                .and_modify(|c| *c += 1);
             while let Some(Some(pred)) = predecessor.get(&current) {
-                job_critical_count.entry(dag.graph[*pred].id.clone()).and_modify(|c| *c += 1);
+                job_critical_count
+                    .entry(dag.graph[*pred].id.clone())
+                    .and_modify(|c| *c += 1);
                 current = *pred;
             }
         }
@@ -148,9 +162,11 @@ pub fn simulate(dag: &PipelineDag, num_runs: usize, variance_factor: f64) -> Sim
     run_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
     let mean = run_durations.iter().sum::<f64>() / num_runs as f64;
-    let variance = run_durations.iter()
+    let variance = run_durations
+        .iter()
         .map(|d| (d - mean).powi(2))
-        .sum::<f64>() / num_runs as f64;
+        .sum::<f64>()
+        / num_runs as f64;
     let std_dev = variance.sqrt();
 
     let p50 = percentile(&run_durations, 50.0);
@@ -166,7 +182,8 @@ pub fn simulate(dag: &PipelineDag, num_runs: usize, variance_factor: f64) -> Sim
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
         let job_mean = sorted.iter().sum::<f64>() / sorted.len() as f64;
-        let critical_pct = *job_critical_count.get(&job.id).unwrap_or(&0) as f64 / num_runs as f64 * 100.0;
+        let critical_pct =
+            *job_critical_count.get(&job.id).unwrap_or(&0) as f64 / num_runs as f64 * 100.0;
 
         job_stats.push(JobSimStats {
             job_id: job.id.clone(),
@@ -178,7 +195,11 @@ pub fn simulate(dag: &PipelineDag, num_runs: usize, variance_factor: f64) -> Sim
     }
 
     // Sort job stats by critical path percentage (most critical first)
-    job_stats.sort_by(|a, b| b.on_critical_path_pct.partial_cmp(&a.on_critical_path_pct).unwrap());
+    job_stats.sort_by(|a, b| {
+        b.on_critical_path_pct
+            .partial_cmp(&a.on_critical_path_pct)
+            .unwrap()
+    });
 
     // Build histogram
     let histogram = build_histogram(&run_durations, 20);
@@ -229,7 +250,8 @@ fn build_histogram(sorted: &[f64], num_buckets: usize) -> Vec<HistogramBucket> {
     for i in 0..num_buckets {
         let lower = min + i as f64 * bucket_width;
         let upper = lower + bucket_width;
-        let count = sorted.iter()
+        let count = sorted
+            .iter()
             .filter(|&&v| {
                 if i == num_buckets - 1 {
                     v >= lower

@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use crate::health_score::HealthScore;
+use serde::{Deserialize, Serialize};
 
 /// Severity level for analysis findings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -129,21 +129,31 @@ impl AnalysisReport {
     }
 
     pub fn total_savings_secs(&self) -> f64 {
-        self.findings.iter()
+        self.findings
+            .iter()
             .filter_map(|f| f.estimated_savings_secs)
             .sum()
     }
 
     pub fn critical_count(&self) -> usize {
-        self.findings.iter().filter(|f| f.severity == Severity::Critical).count()
+        self.findings
+            .iter()
+            .filter(|f| f.severity == Severity::Critical)
+            .count()
     }
 
     pub fn high_count(&self) -> usize {
-        self.findings.iter().filter(|f| f.severity == Severity::High).count()
+        self.findings
+            .iter()
+            .filter(|f| f.severity == Severity::High)
+            .count()
     }
 
     pub fn medium_count(&self) -> usize {
-        self.findings.iter().filter(|f| f.severity == Severity::Medium).count()
+        self.findings
+            .iter()
+            .filter(|f| f.severity == Severity::Medium)
+            .count()
     }
 }
 

@@ -9,8 +9,17 @@ pub struct GitLabCIParser;
 
 /// Reserved top-level keywords in GitLab CI that are NOT job definitions.
 const RESERVED_KEYWORDS: &[&str] = &[
-    "image", "services", "stages", "before_script", "after_script",
-    "variables", "cache", "default", "include", "workflow", "pages",
+    "image",
+    "services",
+    "stages",
+    "before_script",
+    "after_script",
+    "variables",
+    "cache",
+    "default",
+    "include",
+    "workflow",
+    "pages",
 ];
 
 impl GitLabCIParser {
@@ -23,17 +32,13 @@ impl GitLabCIParser {
 
     /// Parse GitLab CI YAML content into a Pipeline DAG.
     pub fn parse(content: &str, source_file: String) -> Result<PipelineDag> {
-        let yaml: Value = serde_yaml::from_str(content)
-            .context("Failed to parse YAML")?;
+        let yaml: Value = serde_yaml::from_str(content).context("Failed to parse YAML")?;
 
-        let mapping = yaml.as_mapping()
+        let mapping = yaml
+            .as_mapping()
             .context("GitLab CI config must be a YAML mapping")?;
 
-        let mut dag = PipelineDag::new(
-            source_file.clone(),
-            source_file,
-            "gitlab-ci".to_string(),
-        );
+        let mut dag = PipelineDag::new(source_file.clone(), source_file, "gitlab-ci".to_string());
 
         // Parse stages (defines execution order)
         let stages = Self::parse_stages(&yaml);
@@ -47,7 +52,8 @@ impl GitLabCIParser {
         let global_cache = yaml.get("cache");
 
         // Parse global default settings
-        let default_image = yaml.get("default")
+        let default_image = yaml
+            .get("default")
             .and_then(|d| d.get("image"))
             .or_else(|| yaml.get("image"))
             .and_then(Self::parse_image);
@@ -72,7 +78,11 @@ impl GitLabCIParser {
             }
 
             let job = Self::parse_job(key_str, value, &stages, &default_image, global_cache)?;
-            let stage = job.env.get("__stage").cloned().unwrap_or_else(|| "test".to_string());
+            let stage = job
+                .env
+                .get("__stage")
+                .cloned()
+                .unwrap_or_else(|| "test".to_string());
 
             jobs_by_stage.entry(stage).or_default().push(job.id.clone());
             dag.add_job(job);
@@ -103,7 +113,8 @@ impl GitLabCIParser {
                 }
             } else {
                 // Otherwise, depend on all jobs from the previous stage
-                let job_stage = value.get("stage")
+                let job_stage = value
+                    .get("stage")
                     .and_then(|v| v.as_str())
                     .unwrap_or("test")
                     .to_string();
@@ -135,11 +146,13 @@ impl GitLabCIParser {
                     .filter_map(|v| v.as_str().map(String::from))
                     .collect()
             })
-            .unwrap_or_else(|| vec![
-                "build".to_string(),
-                "test".to_string(),
-                "deploy".to_string(),
-            ])
+            .unwrap_or_else(|| {
+                vec![
+                    "build".to_string(),
+                    "test".to_string(),
+                    "deploy".to_string(),
+                ]
+            })
     }
 
     fn parse_job(
@@ -153,14 +166,16 @@ impl GitLabCIParser {
         let mut job = JobNode::new(job_id.to_string(), name);
 
         // Stage
-        let stage = config.get("stage")
+        let stage = config
+            .get("stage")
             .and_then(|v| v.as_str())
             .unwrap_or("test")
             .to_string();
         job.env.insert("__stage".to_string(), stage);
 
         // Image (runner)
-        let image = config.get("image")
+        let image = config
+            .get("image")
             .and_then(Self::parse_image)
             .or_else(|| default_image.clone())
             .unwrap_or_else(|| "docker".to_string());
@@ -176,7 +191,8 @@ impl GitLabCIParser {
         // Rules / only / except → condition
         if let Some(rules) = config.get("rules") {
             if let Some(seq) = rules.as_sequence() {
-                let rule_strs: Vec<String> = seq.iter()
+                let rule_strs: Vec<String> = seq
+                    .iter()
                     .filter_map(|r| r.get("if").and_then(|v| v.as_str()).map(String::from))
                     .collect();
                 if !rule_strs.is_empty() {
@@ -271,7 +287,9 @@ impl GitLabCIParser {
         }
 
         // Estimate total duration
-        job.estimated_duration_secs = job.steps.iter()
+        job.estimated_duration_secs = job
+            .steps
+            .iter()
             .filter_map(|s| s.estimated_duration_secs)
             .sum();
 
@@ -280,19 +298,17 @@ impl GitLabCIParser {
 
     fn parse_needs(needs: &Value) -> Vec<String> {
         match needs {
-            Value::Sequence(seq) => {
-                seq.iter().filter_map(|v| {
-                    match v {
-                        Value::String(s) => Some(s.clone()),
-                        Value::Mapping(m) => {
-                            m.get(Value::String("job".to_string()))
-                                .and_then(|v| v.as_str())
-                                .map(String::from)
-                        }
-                        _ => None,
-                    }
-                }).collect()
-            }
+            Value::Sequence(seq) => seq
+                .iter()
+                .filter_map(|v| match v {
+                    Value::String(s) => Some(s.clone()),
+                    Value::Mapping(m) => m
+                        .get(Value::String("job".to_string()))
+                        .and_then(|v| v.as_str())
+                        .map(String::from),
+                    _ => None,
+                })
+                .collect(),
             _ => Vec::new(),
         }
     }
@@ -325,11 +341,10 @@ impl GitLabCIParser {
     fn parse_image(v: &Value) -> Option<String> {
         match v {
             Value::String(s) => Some(s.clone()),
-            Value::Mapping(m) => {
-                m.get(Value::String("name".to_string()))
-                    .and_then(|v| v.as_str())
-                    .map(String::from)
-            }
+            Value::Mapping(m) => m
+                .get(Value::String("name".to_string()))
+                .and_then(|v| v.as_str())
+                .map(String::from),
             _ => None,
         }
     }
@@ -340,7 +355,8 @@ impl GitLabCIParser {
         if let Some(workflow) = yaml.get("workflow") {
             if let Some(rules) = workflow.get("rules").and_then(|v| v.as_sequence()) {
                 for rule in rules {
-                    let event = rule.get("if")
+                    let event = rule
+                        .get("if")
                         .and_then(|v| v.as_str())
                         .unwrap_or("push")
                         .to_string();
@@ -369,7 +385,10 @@ impl GitLabCIParser {
     #[allow(clippy::if_same_then_else)]
     fn estimate_cmd_duration(cmd: &str) -> f64 {
         let cmd_lower = cmd.to_lowercase();
-        if cmd_lower.contains("npm ci") || cmd_lower.contains("npm install") || cmd_lower.contains("yarn install") {
+        if cmd_lower.contains("npm ci")
+            || cmd_lower.contains("npm install")
+            || cmd_lower.contains("yarn install")
+        {
             180.0
         } else if cmd_lower.contains("pip install") {
             120.0
@@ -379,13 +398,23 @@ impl GitLabCIParser {
             300.0
         } else if cmd_lower.contains("npm run build") || cmd_lower.contains("yarn build") {
             240.0
-        } else if cmd_lower.contains("npm test") || cmd_lower.contains("pytest") || cmd_lower.contains("jest") || cmd_lower.contains("rspec") {
+        } else if cmd_lower.contains("npm test")
+            || cmd_lower.contains("pytest")
+            || cmd_lower.contains("jest")
+            || cmd_lower.contains("rspec")
+        {
             300.0
-        } else if cmd_lower.contains("eslint") || cmd_lower.contains("rubocop") || cmd_lower.contains("flake8") {
+        } else if cmd_lower.contains("eslint")
+            || cmd_lower.contains("rubocop")
+            || cmd_lower.contains("flake8")
+        {
             60.0
         } else if cmd_lower.contains("docker build") {
             300.0
-        } else if cmd_lower.contains("deploy") || cmd_lower.contains("kubectl") || cmd_lower.contains("helm") {
+        } else if cmd_lower.contains("deploy")
+            || cmd_lower.contains("kubectl")
+            || cmd_lower.contains("helm")
+        {
             120.0
         } else if cmd_lower.contains("bundle install") {
             150.0

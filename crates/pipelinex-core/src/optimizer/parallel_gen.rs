@@ -3,7 +3,9 @@ use serde_yaml::Value;
 
 /// Apply parallelization optimizations to the workflow YAML.
 pub fn apply_parallel_optimizations(yaml: &mut Value, report: &AnalysisReport) {
-    let parallel_findings: Vec<_> = report.findings.iter()
+    let parallel_findings: Vec<_> = report
+        .findings
+        .iter()
         .filter(|f| matches!(f.category, FindingCategory::SerialBottleneck))
         .collect();
 
@@ -47,9 +49,7 @@ fn remove_false_dependency(
                     }
                 }
                 Value::Sequence(seq) => {
-                    seq.retain(|v| {
-                        v.as_str().is_none_or(|s| s != dependency_id)
-                    });
+                    seq.retain(|v| v.as_str().is_none_or(|s| s != dependency_id));
                     // If no dependencies left, remove needs
                     if seq.is_empty() {
                         if let Some(mapping) = job_config.as_mapping_mut() {

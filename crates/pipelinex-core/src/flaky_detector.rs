@@ -252,10 +252,9 @@ impl FlakyDetector {
             .filter_map(|r| r.error_message.as_deref())
             .collect();
 
-        if error_messages
-            .iter()
-            .any(|msg| msg.contains("timeout") || msg.contains("connection") || msg.contains("network"))
-        {
+        if error_messages.iter().any(|msg| {
+            msg.contains("timeout") || msg.contains("connection") || msg.contains("network")
+        }) {
             return FlakyCategory::EnvironmentSensitive;
         }
 
@@ -410,7 +409,10 @@ mod tests {
         ];
 
         let score = detector.calculate_flakiness_score(&results);
-        assert!(score > 0.6, "Alternating test should have high flakiness score");
+        assert!(
+            score > 0.6,
+            "Alternating test should have high flakiness score"
+        );
     }
 
     #[test]

@@ -1,5 +1,5 @@
-use crate::parser::dag::{JobNode, PipelineDag};
 use crate::analyzer::report::{Finding, FindingCategory, Severity};
+use crate::parser::dag::{JobNode, PipelineDag};
 use petgraph::graph::NodeIndex;
 use petgraph::Direction;
 use std::collections::HashMap;
@@ -38,12 +38,11 @@ pub fn find_critical_path(dag: &PipelineDag) -> (Vec<&JobNode>, f64) {
 
     // Find the leaf node with the longest total path
     let leaves = dag.leaf_jobs();
-    let end_node = leaves.into_iter()
-        .max_by(|a, b| {
-            let da = longest_dist[a] + graph[*a].estimated_duration_secs;
-            let db = longest_dist[b] + graph[*b].estimated_duration_secs;
-            da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
-        });
+    let end_node = leaves.into_iter().max_by(|a, b| {
+        let da = longest_dist[a] + graph[*a].estimated_duration_secs;
+        let db = longest_dist[b] + graph[*b].estimated_duration_secs;
+        da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let end_node = match end_node {
         Some(n) => n,
@@ -79,9 +78,11 @@ pub fn analyze_critical_path(
     }
 
     // Find the single biggest bottleneck on the critical path
-    if let Some(bottleneck) = critical_path.iter()
-        .max_by(|a, b| a.estimated_duration_secs.partial_cmp(&b.estimated_duration_secs).unwrap())
-    {
+    if let Some(bottleneck) = critical_path.iter().max_by(|a, b| {
+        a.estimated_duration_secs
+            .partial_cmp(&b.estimated_duration_secs)
+            .unwrap()
+    }) {
         let pct = if total_duration > 0.0 {
             bottleneck.estimated_duration_secs / total_duration * 100.0
         } else {
@@ -92,14 +93,14 @@ pub fn analyze_critical_path(
             findings.push(Finding {
                 severity: Severity::High,
                 category: FindingCategory::CriticalPath,
-                title: format!("'{}' dominates the critical path ({:.1}%)", bottleneck.id, pct),
+                title: format!(
+                    "'{}' dominates the critical path ({:.1}%)",
+                    bottleneck.id, pct
+                ),
                 description: format!(
                     "Job '{}' takes {:.0}s ({:.1}% of the {:.0}s critical path). \
                     This is the single biggest opportunity to reduce pipeline time.",
-                    bottleneck.id,
-                    bottleneck.estimated_duration_secs,
-                    pct,
-                    total_duration,
+                    bottleneck.id, bottleneck.estimated_duration_secs, pct, total_duration,
                 ),
                 affected_jobs: vec![bottleneck.id.clone()],
                 recommendation: format!(
@@ -119,7 +120,9 @@ pub fn analyze_critical_path(
     }
 
     // Check theoretical parallelism efficiency
-    let total_job_time: f64 = dag.graph.node_weights()
+    let total_job_time: f64 = dag
+        .graph
+        .node_weights()
         .map(|j| j.estimated_duration_secs)
         .sum();
     let parallelism = dag.max_parallelism();

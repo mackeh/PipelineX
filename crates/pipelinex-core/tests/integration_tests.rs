@@ -1,19 +1,21 @@
+use pipelinex_core::analyzer;
+use pipelinex_core::optimizer::docker_opt;
+use pipelinex_core::optimizer::Optimizer;
+use pipelinex_core::parser::bitbucket::BitbucketParser;
+use pipelinex_core::parser::circleci::CircleCIParser;
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
 use pipelinex_core::parser::jenkins::JenkinsParser;
-use pipelinex_core::parser::circleci::CircleCIParser;
-use pipelinex_core::parser::bitbucket::BitbucketParser;
-use pipelinex_core::analyzer;
-use pipelinex_core::optimizer::Optimizer;
-use pipelinex_core::optimizer::docker_opt;
 use std::path::{Path, PathBuf};
 
 /// Get the workspace root (two levels up from CARGO_MANIFEST_DIR of pipelinex-core).
 fn fixtures_dir() -> PathBuf {
     let manifest_dir = env!("CARGO_MANIFEST_DIR");
     Path::new(manifest_dir)
-        .parent().unwrap()  // crates/
-        .parent().unwrap()  // workspace root
+        .parent()
+        .unwrap() // crates/
+        .parent()
+        .unwrap() // workspace root
         .join("tests/fixtures")
 }
 
@@ -55,7 +57,10 @@ fn test_analyze_unoptimized_fullstack() {
         report.potential_improvement_pct() > 10.0,
         "Expected significant improvement potential"
     );
-    assert!(report.findings.iter().any(|f| f.category == pipelinex_core::analyzer::report::FindingCategory::MissingCache));
+    assert!(report
+        .findings
+        .iter()
+        .any(|f| f.category == pipelinex_core::analyzer::report::FindingCategory::MissingCache));
 }
 
 #[test]
@@ -105,7 +110,10 @@ fn test_analyze_docker_publish() {
     let report = analyzer::analyze(&dag);
 
     assert_eq!(report.job_count, 3);
-    assert!(report.max_parallelism >= 2, "lint and test should run in parallel");
+    assert!(
+        report.max_parallelism >= 2,
+        "lint and test should run in parallel"
+    );
 }
 
 #[test]
@@ -116,7 +124,10 @@ fn test_optimize_produces_valid_yaml() {
     let optimized = Optimizer::optimize(&path, &report).unwrap();
 
     let parsed: serde_yaml::Value = serde_yaml::from_str(&optimized).unwrap();
-    assert!(parsed.get("jobs").is_some(), "Optimized YAML should have jobs");
+    assert!(
+        parsed.get("jobs").is_some(),
+        "Optimized YAML should have jobs"
+    );
 }
 
 #[test]
@@ -222,9 +233,15 @@ fn test_docker_analyze_unoptimized_node() {
     let content = std::fs::read_to_string(docker_fixture("unoptimized-node.Dockerfile")).unwrap();
     let analysis = docker_opt::analyze_dockerfile(&content);
 
-    assert!(analysis.findings.len() >= 2, "Should detect multiple issues");
     assert!(
-        analysis.findings.iter().any(|f| f.title.contains("COPY . . before")),
+        analysis.findings.len() >= 2,
+        "Should detect multiple issues"
+    );
+    assert!(
+        analysis
+            .findings
+            .iter()
+            .any(|f| f.title.contains("COPY . . before")),
         "Should detect COPY before install"
     );
     assert!(analysis.optimized_dockerfile.is_some());
@@ -235,7 +252,8 @@ fn test_docker_analyze_optimized_has_fewer_issues() {
     let content = std::fs::read_to_string(docker_fixture("optimized-node.Dockerfile")).unwrap();
     let analysis = docker_opt::analyze_dockerfile(&content);
 
-    let unoptimized = std::fs::read_to_string(docker_fixture("unoptimized-node.Dockerfile")).unwrap();
+    let unoptimized =
+        std::fs::read_to_string(docker_fixture("unoptimized-node.Dockerfile")).unwrap();
     let unopt_analysis = docker_opt::analyze_dockerfile(&unoptimized);
 
     assert!(
@@ -253,7 +271,10 @@ fn test_docker_analyze_python() {
 
     assert!(!analysis.findings.is_empty());
     assert!(
-        analysis.findings.iter().any(|f| f.title.contains("Non-slim")),
+        analysis
+            .findings
+            .iter()
+            .any(|f| f.title.contains("Non-slim")),
         "Should detect non-slim Python image"
     );
 }
@@ -265,7 +286,10 @@ fn test_docker_analyze_go() {
 
     assert!(!analysis.findings.is_empty());
     assert!(
-        analysis.findings.iter().any(|f| f.title.contains("multi-stage")),
+        analysis
+            .findings
+            .iter()
+            .any(|f| f.title.contains("multi-stage")),
         "Should recommend multi-stage build for Go"
     );
 }
@@ -312,7 +336,10 @@ fn test_analyze_circleci_config() {
 
     assert_eq!(report.provider, "circleci");
     assert_eq!(report.job_count, 5);
-    assert!(report.max_parallelism >= 2, "lint and test should run in parallel");
+    assert!(
+        report.max_parallelism >= 2,
+        "lint and test should run in parallel"
+    );
 }
 
 #[test]
@@ -336,7 +363,10 @@ fn test_circleci_detects_bottlenecks() {
     let report = analyzer::analyze(&dag);
 
     // Should detect serial bottlenecks or missing caches
-    assert!(!report.findings.is_empty(), "Should detect optimization opportunities");
+    assert!(
+        !report.findings.is_empty(),
+        "Should detect optimization opportunities"
+    );
     assert!(
         report.findings.iter().any(|f| {
             f.category == pipelinex_core::analyzer::report::FindingCategory::SerialBottleneck
@@ -355,8 +385,14 @@ fn test_analyze_bitbucket_pipelines() {
     let report = analyzer::analyze(&dag);
 
     assert_eq!(report.provider, "bitbucket");
-    assert!(report.job_count >= 5, "Should have multiple jobs from different pipeline types");
-    assert!(report.max_parallelism >= 3, "Should detect parallel execution");
+    assert!(
+        report.job_count >= 5,
+        "Should have multiple jobs from different pipeline types"
+    );
+    assert!(
+        report.max_parallelism >= 3,
+        "Should detect parallel execution"
+    );
 }
 
 #[test]
@@ -390,5 +426,8 @@ fn test_bitbucket_finds_optimizations() {
 
     // Should detect missing caches and parallel opportunities
     assert!(!report.findings.is_empty());
-    assert!(report.potential_improvement_pct() > 50.0, "Should find significant optimizations");
+    assert!(
+        report.potential_improvement_pct() > 50.0,
+        "Should find significant optimizations"
+    );
 }

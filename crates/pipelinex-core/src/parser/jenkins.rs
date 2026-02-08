@@ -1,4 +1,4 @@
-use crate::parser::dag::{PipelineDag, JobNode, StepInfo};
+use crate::parser::dag::{JobNode, PipelineDag, StepInfo};
 use anyhow::{Context, Result};
 use regex::Regex;
 use std::collections::HashMap;
@@ -17,7 +17,11 @@ impl JenkinsParser {
 
     /// Parse a Jenkinsfile from string content.
     pub fn parse(content: &str, source: String) -> Result<PipelineDag> {
-        let mut dag = PipelineDag::new("Jenkins Pipeline".to_string(), source, "jenkins".to_string());
+        let mut dag = PipelineDag::new(
+            "Jenkins Pipeline".to_string(),
+            source,
+            "jenkins".to_string(),
+        );
 
         // Extract pipeline name from file or content
         if let Some(name) = Self::extract_pipeline_name(content) {
@@ -95,7 +99,9 @@ impl JenkinsParser {
             let stage_name = cap[1].to_string();
 
             // Extract the stage block content
-            if let Some(block_content) = Self::extract_block_after_match(content, cap.get(0).unwrap().end()) {
+            if let Some(block_content) =
+                Self::extract_block_after_match(content, cap.get(0).unwrap().end())
+            {
                 let steps = Self::extract_steps(&block_content);
                 let agent = Self::extract_agent(&block_content);
                 let when_condition = Self::extract_when_condition(&block_content);
@@ -149,7 +155,9 @@ impl JenkinsParser {
 
         // Match steps block: steps { ... }
         if let Some(steps_start) = block_content.find("steps") {
-            if let Some(steps_block) = Self::extract_block_after_match(block_content, steps_start + 5) {
+            if let Some(steps_block) =
+                Self::extract_block_after_match(block_content, steps_start + 5)
+            {
                 // Extract individual commands
                 let commands = Self::extract_commands(&steps_block);
                 for (i, cmd) in commands.iter().enumerate() {
@@ -214,7 +222,9 @@ impl JenkinsParser {
         let mut env = HashMap::new();
 
         if let Some(env_block_start) = block_content.find("environment") {
-            if let Some(env_block) = Self::extract_block_after_match(block_content, env_block_start + 11) {
+            if let Some(env_block) =
+                Self::extract_block_after_match(block_content, env_block_start + 11)
+            {
                 let env_re = Regex::new(r#"(\w+)\s*=\s*['"]([^'"]+)['"]"#).unwrap();
                 for cap in env_re.captures_iter(&env_block) {
                     env.insert(cap[1].to_string(), cap[2].to_string());
@@ -287,11 +297,13 @@ impl JenkinsParser {
     #[allow(clippy::regex_creation_in_loops)]
     fn handle_parallel_stages(dag: &mut PipelineDag, content: &str) -> Result<()> {
         // Match parallel blocks: parallel { stage1: { ... }, stage2: { ... } }
-        let parallel_re = Regex::new(r"parallel\s*\{")
-            .context("Failed to compile parallel regex")?;
+        let parallel_re =
+            Regex::new(r"parallel\s*\{").context("Failed to compile parallel regex")?;
 
         for parallel_match in parallel_re.find_iter(content) {
-            if let Some(parallel_block) = Self::extract_block_after_match(content, parallel_match.end()) {
+            if let Some(parallel_block) =
+                Self::extract_block_after_match(content, parallel_match.end())
+            {
                 // Extract stage names within the parallel block
                 let stage_re = Regex::new(r#"(\w+)\s*:\s*\{"#).unwrap();
                 let parallel_stages: Vec<String> = stage_re
@@ -305,9 +317,11 @@ impl JenkinsParser {
                     let prev = &parallel_stages[i - 1];
 
                     // Remove the dependency edge if it exists
-                    if let Some(job) = dag.graph.node_indices().find(|&idx| {
-                        dag.graph[idx].id == *current
-                    }) {
+                    if let Some(job) = dag
+                        .graph
+                        .node_indices()
+                        .find(|&idx| dag.graph[idx].id == *current)
+                    {
                         // Update needs to remove previous parallel stage
                         if let Some(job_data) = dag.graph.node_weight_mut(job) {
                             job_data.needs.retain(|n| n != prev);

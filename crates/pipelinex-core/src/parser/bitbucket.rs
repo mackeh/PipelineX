@@ -1,4 +1,4 @@
-use crate::parser::dag::{PipelineDag, JobNode, StepInfo, CacheConfig};
+use crate::parser::dag::{CacheConfig, JobNode, PipelineDag, StepInfo};
 use anyhow::{Context, Result};
 use serde_yaml::Value;
 use std::collections::HashMap;
@@ -10,15 +10,19 @@ pub struct BitbucketParser;
 impl BitbucketParser {
     /// Parse a Bitbucket Pipelines config from a file path.
     pub fn parse_file(path: &Path) -> Result<PipelineDag> {
-        let content = std::fs::read_to_string(path)
-            .with_context(|| format!("Failed to read Bitbucket Pipelines file: {}", path.display()))?;
+        let content = std::fs::read_to_string(path).with_context(|| {
+            format!(
+                "Failed to read Bitbucket Pipelines file: {}",
+                path.display()
+            )
+        })?;
         Self::parse(&content, path.display().to_string())
     }
 
     /// Parse a Bitbucket Pipelines config from string content.
     pub fn parse(content: &str, source: String) -> Result<PipelineDag> {
-        let yaml: Value = serde_yaml::from_str(content)
-            .context("Failed to parse Bitbucket Pipelines YAML")?;
+        let yaml: Value =
+            serde_yaml::from_str(content).context("Failed to parse Bitbucket Pipelines YAML")?;
 
         let mut dag = PipelineDag::new(
             "Bitbucket Pipeline".to_string(),
@@ -233,7 +237,8 @@ impl BitbucketParser {
                         "node" if !found_types.contains("node") => {
                             caches.push(CacheConfig {
                                 path: "node_modules".to_string(),
-                                key_pattern: "node-{{ checksum \"package-lock.json\" }}".to_string(),
+                                key_pattern: "node-{{ checksum \"package-lock.json\" }}"
+                                    .to_string(),
                                 restore_keys: vec!["node-".to_string()],
                             });
                             found_types.insert("node");

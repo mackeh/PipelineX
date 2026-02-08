@@ -3,10 +3,11 @@ use serde_yaml::Value;
 
 /// Apply test sharding optimizations to the workflow YAML.
 pub fn apply_shard_optimizations(yaml: &mut Value, report: &AnalysisReport) {
-    let shard_findings: Vec<_> = report.findings.iter()
+    let shard_findings: Vec<_> = report
+        .findings
+        .iter()
         .filter(|f| {
-            matches!(f.category, FindingCategory::SerialBottleneck)
-                && f.title.contains("sharded")
+            matches!(f.category, FindingCategory::SerialBottleneck) && f.title.contains("sharded")
         })
         .collect();
 
@@ -21,7 +22,8 @@ pub fn apply_shard_optimizations(yaml: &mut Value, report: &AnalysisReport) {
 
     for finding in &shard_findings {
         // Extract shard count from title (e.g., "could be sharded into 4 parallel jobs")
-        let shard_count = finding.title
+        let shard_count = finding
+            .title
             .split_whitespace()
             .find_map(|w| w.parse::<usize>().ok())
             .unwrap_or(4);
@@ -48,16 +50,10 @@ fn inject_shard_strategy(job_config: &mut Value, shard_count: usize) {
         .map(|i| Value::Number(serde_yaml::Number::from(i as u64)))
         .collect();
 
-    matrix.insert(
-        Value::String("shard".to_string()),
-        Value::Sequence(shards),
-    );
+    matrix.insert(Value::String("shard".to_string()), Value::Sequence(shards));
 
     let mut strategy = serde_yaml::Mapping::new();
-    strategy.insert(
-        Value::String("matrix".to_string()),
-        Value::Mapping(matrix),
-    );
+    strategy.insert(Value::String("matrix".to_string()), Value::Mapping(matrix));
 
     if let Some(mapping) = job_config.as_mapping_mut() {
         mapping.insert(
@@ -83,8 +79,12 @@ pub fn optimize_matrix(
 
     let version_var = variables.keys().find(|k| {
         let k = k.to_lowercase();
-        k.contains("node") || k.contains("python") || k.contains("ruby")
-            || k.contains("java") || k.contains("go") || k.contains("rust")
+        k.contains("node")
+            || k.contains("python")
+            || k.contains("ruby")
+            || k.contains("java")
+            || k.contains("go")
+            || k.contains("rust")
             || k == "version"
     });
 
@@ -100,19 +100,14 @@ pub fn optimize_matrix(
                     Value::String(os_key.clone()),
                     Value::String(primary.to_string()),
                 );
-                entry.insert(
-                    Value::String(ver_key.clone()),
-                    Value::String(ver.clone()),
-                );
-                entry.insert(
-                    Value::String("full_suite".to_string()),
-                    Value::Bool(true),
-                );
+                entry.insert(Value::String(ver_key.clone()), Value::String(ver.clone()));
+                entry.insert(Value::String("full_suite".to_string()), Value::Bool(true));
                 include.push(Value::Mapping(entry));
             }
 
             // Smoke tests on secondary OSes with default version
-            let default_ver = ver_values.iter()
+            let default_ver = ver_values
+                .iter()
                 .find(|v| !v.contains("nightly") && !v.contains("beta"))
                 .or(ver_values.first());
 
@@ -120,18 +115,12 @@ pub fn optimize_matrix(
                 for os in os_values {
                     if os != primary {
                         let mut entry = serde_yaml::Mapping::new();
-                        entry.insert(
-                            Value::String(os_key.clone()),
-                            Value::String(os.clone()),
-                        );
+                        entry.insert(Value::String(os_key.clone()), Value::String(os.clone()));
                         entry.insert(
                             Value::String(ver_key.clone()),
                             Value::String(default_ver.clone()),
                         );
-                        entry.insert(
-                            Value::String("full_suite".to_string()),
-                            Value::Bool(false),
-                        );
+                        entry.insert(Value::String("full_suite".to_string()), Value::Bool(false));
                         include.push(Value::Mapping(entry));
                     }
                 }
@@ -143,10 +132,7 @@ pub fn optimize_matrix(
             for (key, values) in variables {
                 for val in values {
                     let mut entry = serde_yaml::Mapping::new();
-                    entry.insert(
-                        Value::String(key.clone()),
-                        Value::String(val.clone()),
-                    );
+                    entry.insert(Value::String(key.clone()), Value::String(val.clone()));
                     include.push(Value::Mapping(entry));
                 }
             }
@@ -170,21 +156,25 @@ mod tests {
     #[test]
     fn test_optimize_matrix_reduces_combinations() {
         let mut vars = HashMap::new();
-        vars.insert("os".to_string(), vec![
-            "ubuntu-latest".to_string(),
-            "macos-latest".to_string(),
-            "windows-latest".to_string(),
-        ]);
-        vars.insert("node".to_string(), vec![
-            "18".to_string(),
-            "20".to_string(),
-            "22".to_string(),
-        ]);
+        vars.insert(
+            "os".to_string(),
+            vec![
+                "ubuntu-latest".to_string(),
+                "macos-latest".to_string(),
+                "windows-latest".to_string(),
+            ],
+        );
+        vars.insert(
+            "node".to_string(),
+            vec!["18".to_string(), "20".to_string(), "22".to_string()],
+        );
 
         // Full matrix = 3 * 3 = 9 combinations
         let optimized = optimize_matrix(&vars, Some("ubuntu-latest"));
-        let include = optimized.as_mapping().unwrap()
-            .get(&Value::String("include".to_string()))
+        let include = optimized
+            .as_mapping()
+            .unwrap()
+            .get(Value::String("include".to_string()))
             .unwrap()
             .as_sequence()
             .unwrap();

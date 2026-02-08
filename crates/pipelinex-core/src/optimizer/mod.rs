@@ -1,7 +1,7 @@
 pub mod cache_gen;
+pub mod docker_opt;
 pub mod parallel_gen;
 pub mod shard_gen;
-pub mod docker_opt;
 
 use crate::analyzer::report::AnalysisReport;
 use anyhow::Result;
@@ -53,7 +53,10 @@ impl Optimizer {
 
 fn apply_path_filter(yaml: &mut Value, report: &AnalysisReport) {
     let has_path_finding = report.findings.iter().any(|f| {
-        matches!(f.category, crate::analyzer::report::FindingCategory::MissingPathFilter)
+        matches!(
+            f.category,
+            crate::analyzer::report::FindingCategory::MissingPathFilter
+        )
     });
 
     if !has_path_finding {
@@ -71,10 +74,7 @@ fn apply_path_filter(yaml: &mut Value, report: &AnalysisReport) {
                     Value::String("LICENSE".to_string()),
                 ]);
                 if let Some(mapping) = push.as_mapping_mut() {
-                    mapping.insert(
-                        Value::String("paths-ignore".to_string()),
-                        paths_ignore,
-                    );
+                    mapping.insert(Value::String("paths-ignore".to_string()), paths_ignore);
                 }
             }
         }
@@ -88,10 +88,7 @@ fn apply_path_filter(yaml: &mut Value, report: &AnalysisReport) {
                     Value::String("LICENSE".to_string()),
                 ]);
                 if let Some(mapping) = pr.as_mapping_mut() {
-                    mapping.insert(
-                        Value::String("paths-ignore".to_string()),
-                        paths_ignore,
-                    );
+                    mapping.insert(Value::String("paths-ignore".to_string()), paths_ignore);
                 }
             }
         }
@@ -100,7 +97,10 @@ fn apply_path_filter(yaml: &mut Value, report: &AnalysisReport) {
 
 fn apply_concurrency(yaml: &mut Value, report: &AnalysisReport) {
     let has_concurrency_finding = report.findings.iter().any(|f| {
-        matches!(f.category, crate::analyzer::report::FindingCategory::ConcurrencyControl)
+        matches!(
+            f.category,
+            crate::analyzer::report::FindingCategory::ConcurrencyControl
+        )
     });
 
     if !has_concurrency_finding {
@@ -129,7 +129,10 @@ fn apply_concurrency(yaml: &mut Value, report: &AnalysisReport) {
 
 fn apply_shallow_clone(yaml: &mut Value, report: &AnalysisReport) {
     let has_shallow_finding = report.findings.iter().any(|f| {
-        matches!(f.category, crate::analyzer::report::FindingCategory::ShallowClone)
+        matches!(
+            f.category,
+            crate::analyzer::report::FindingCategory::ShallowClone
+        )
     });
 
     if !has_shallow_finding {
@@ -139,7 +142,10 @@ fn apply_shallow_clone(yaml: &mut Value, report: &AnalysisReport) {
     // Walk through all jobs and their steps to add fetch-depth: 1
     if let Some(jobs) = yaml.get_mut("jobs").and_then(|v| v.as_mapping_mut()) {
         for (_job_id, job_config) in jobs.iter_mut() {
-            if let Some(steps) = job_config.get_mut("steps").and_then(|v| v.as_sequence_mut()) {
+            if let Some(steps) = job_config
+                .get_mut("steps")
+                .and_then(|v| v.as_sequence_mut())
+            {
                 for step in steps.iter_mut() {
                     if let Some(uses) = step.get("uses").and_then(|v| v.as_str()) {
                         if uses.starts_with("actions/checkout") {

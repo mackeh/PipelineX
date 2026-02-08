@@ -3,7 +3,9 @@ use serde_yaml::Value;
 
 /// Apply cache optimizations to the workflow YAML.
 pub fn apply_cache_optimizations(yaml: &mut Value, report: &AnalysisReport) {
-    let cache_findings: Vec<_> = report.findings.iter()
+    let cache_findings: Vec<_> = report
+        .findings
+        .iter()
         .filter(|f| matches!(f.category, FindingCategory::MissingCache))
         .collect();
 
@@ -27,13 +29,19 @@ pub fn apply_cache_optimizations(yaml: &mut Value, report: &AnalysisReport) {
 }
 
 fn inject_cache_step(job_config: &mut Value, finding_title: &str) {
-    let steps = match job_config.get_mut("steps").and_then(|v| v.as_sequence_mut()) {
+    let steps = match job_config
+        .get_mut("steps")
+        .and_then(|v| v.as_sequence_mut())
+    {
         Some(s) => s,
         None => return,
     };
 
     // Determine what type of cache to inject based on the finding
-    let cache_step = if finding_title.contains("npm") || finding_title.contains("yarn") || finding_title.contains("pnpm") {
+    let cache_step = if finding_title.contains("npm")
+        || finding_title.contains("yarn")
+        || finding_title.contains("pnpm")
+    {
         create_node_cache_step()
     } else if finding_title.contains("pip") {
         create_pip_cache_step()
@@ -81,10 +89,7 @@ fn create_node_cache_step() -> Value {
         Value::String("node-${{ runner.os }}-".to_string()),
     );
 
-    step.insert(
-        Value::String("with".to_string()),
-        Value::Mapping(with),
-    );
+    step.insert(Value::String("with".to_string()), Value::Mapping(with));
 
     Value::Mapping(step)
 }
@@ -114,10 +119,7 @@ fn create_pip_cache_step() -> Value {
         Value::String("pip-${{ runner.os }}-".to_string()),
     );
 
-    step.insert(
-        Value::String("with".to_string()),
-        Value::Mapping(with),
-    );
+    step.insert(Value::String("with".to_string()), Value::Mapping(with));
 
     Value::Mapping(step)
 }
@@ -154,17 +156,16 @@ fn create_gradle_maven_cache_step() -> Value {
     );
     with.insert(
         Value::String("key".to_string()),
-        Value::String("java-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/pom.xml') }}".to_string()),
+        Value::String(
+            "java-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/pom.xml') }}".to_string(),
+        ),
     );
     with.insert(
         Value::String("restore-keys".to_string()),
         Value::String("java-${{ runner.os }}-".to_string()),
     );
 
-    step.insert(
-        Value::String("with".to_string()),
-        Value::Mapping(with),
-    );
+    step.insert(Value::String("with".to_string()), Value::Mapping(with));
 
     Value::Mapping(step)
 }

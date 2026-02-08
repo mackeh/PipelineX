@@ -1,5 +1,5 @@
-use crate::parser::dag::PipelineDag;
 use crate::analyzer::report::{Finding, FindingCategory, Severity};
+use crate::parser::dag::PipelineDag;
 
 /// Detect various forms of waste in the pipeline configuration.
 pub fn detect_waste(dag: &PipelineDag) -> Vec<Finding> {
@@ -18,9 +18,10 @@ pub fn detect_waste(dag: &PipelineDag) -> Vec<Finding> {
 fn detect_missing_path_filters(dag: &PipelineDag) -> Vec<Finding> {
     let mut findings = Vec::new();
 
-    let has_path_filter = dag.triggers.iter().any(|t| {
-        t.paths.is_some() || t.paths_ignore.is_some()
-    });
+    let has_path_filter = dag
+        .triggers
+        .iter()
+        .any(|t| t.paths.is_some() || t.paths_ignore.is_some());
 
     if !has_path_filter && dag.job_count() > 1 {
         findings.push(Finding {
@@ -97,8 +98,10 @@ fn detect_redundant_checkouts(dag: &PipelineDag) -> Vec<Finding> {
         let has_install = job.steps.iter().any(|s| {
             s.run.as_ref().is_some_and(|r| {
                 let cmd = r.to_lowercase();
-                cmd.contains("npm ci") || cmd.contains("npm install")
-                    || cmd.contains("pip install") || cmd.contains("yarn install")
+                cmd.contains("npm ci")
+                    || cmd.contains("npm install")
+                    || cmd.contains("pip install")
+                    || cmd.contains("yarn install")
                     || cmd.contains("pnpm install")
             })
         });
@@ -190,7 +193,9 @@ fn detect_matrix_bloat(dag: &PipelineDag) -> Vec<Finding> {
                         .to_string(),
                     fix_command: None,
                     estimated_savings_secs: Some(
-                        job.estimated_duration_secs * (matrix.total_combinations as f64 - 4.0).max(0.0) / matrix.total_combinations as f64
+                        job.estimated_duration_secs
+                            * (matrix.total_combinations as f64 - 4.0).max(0.0)
+                            / matrix.total_combinations as f64,
                     ),
                     confidence: 0.75,
                     auto_fixable: false,
@@ -226,7 +231,9 @@ jobs:
 "#;
         let dag = GitHubActionsParser::parse(yaml, "ci.yml".to_string()).unwrap();
         let findings = detect_waste(&dag);
-        assert!(findings.iter().any(|f| matches!(f.category, FindingCategory::MissingPathFilter)));
+        assert!(findings
+            .iter()
+            .any(|f| matches!(f.category, FindingCategory::MissingPathFilter)));
     }
 
     #[test]
@@ -252,6 +259,8 @@ jobs:
 "#;
         let dag = GitHubActionsParser::parse(yaml, "ci.yml".to_string()).unwrap();
         let findings = detect_waste(&dag);
-        assert!(!findings.iter().any(|f| matches!(f.category, FindingCategory::MissingPathFilter)));
+        assert!(!findings
+            .iter()
+            .any(|f| matches!(f.category, FindingCategory::MissingPathFilter)));
     }
 }

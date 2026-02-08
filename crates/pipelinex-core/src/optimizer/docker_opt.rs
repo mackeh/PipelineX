@@ -133,8 +133,10 @@ fn check_base_image(instructions: &[DockerInstruction], findings: &mut Vec<Docke
             let image = instr.arguments.split_whitespace().next().unwrap_or("");
             let image_lower = image.to_lowercase();
 
-            if (image_lower.starts_with("node:") || image_lower.starts_with("python:")
-                || image_lower.starts_with("ruby:") || image_lower.starts_with("golang:"))
+            if (image_lower.starts_with("node:")
+                || image_lower.starts_with("python:")
+                || image_lower.starts_with("ruby:")
+                || image_lower.starts_with("golang:"))
                 && !image_lower.contains("slim")
                 && !image_lower.contains("alpine")
                 && !image_lower.contains("distroless")
@@ -159,7 +161,10 @@ fn check_base_image(instructions: &[DockerInstruction], findings: &mut Vec<Docke
     }
 }
 
-fn check_copy_before_install(instructions: &[DockerInstruction], findings: &mut Vec<DockerFinding>) {
+fn check_copy_before_install(
+    instructions: &[DockerInstruction],
+    findings: &mut Vec<DockerFinding>,
+) {
     let mut seen_copy_all = false;
     let mut copy_all_line = 0;
 
@@ -174,10 +179,14 @@ fn check_copy_before_install(instructions: &[DockerInstruction], findings: &mut 
 
         if seen_copy_all && instr.instruction == "RUN" {
             let cmd = instr.arguments.to_lowercase();
-            if cmd.contains("npm ci") || cmd.contains("npm install")
-                || cmd.contains("pip install") || cmd.contains("yarn install")
-                || cmd.contains("bundle install") || cmd.contains("composer install")
-                || cmd.contains("go mod download") || cmd.contains("cargo build")
+            if cmd.contains("npm ci")
+                || cmd.contains("npm install")
+                || cmd.contains("pip install")
+                || cmd.contains("yarn install")
+                || cmd.contains("bundle install")
+                || cmd.contains("composer install")
+                || cmd.contains("go mod download")
+                || cmd.contains("cargo build")
             {
                 findings.push(DockerFinding {
                     severity: DockerSeverity::Critical,
@@ -189,7 +198,8 @@ fn check_copy_before_install(instructions: &[DockerInstruction], findings: &mut 
                         copy_all_line
                     ),
                     line_number: Some(copy_all_line),
-                    fix: "Copy only package.json/lockfile first, run install, then COPY . .".to_string(),
+                    fix: "Copy only package.json/lockfile first, run install, then COPY . ."
+                        .to_string(),
                 });
                 break;
             }
@@ -198,16 +208,20 @@ fn check_copy_before_install(instructions: &[DockerInstruction], findings: &mut 
 }
 
 fn check_multi_stage(instructions: &[DockerInstruction], findings: &mut Vec<DockerFinding>) {
-    let from_count = instructions.iter()
+    let from_count = instructions
+        .iter()
         .filter(|i| i.instruction == "FROM")
         .count();
 
     let has_build_step = instructions.iter().any(|i| {
         i.instruction == "RUN" && {
             let cmd = i.arguments.to_lowercase();
-            cmd.contains("npm run build") || cmd.contains("yarn build")
-                || cmd.contains("cargo build") || cmd.contains("go build")
-                || cmd.contains("mvn package") || cmd.contains("gradle build")
+            cmd.contains("npm run build")
+                || cmd.contains("yarn build")
+                || cmd.contains("cargo build")
+                || cmd.contains("go build")
+                || cmd.contains("mvn package")
+                || cmd.contains("gradle build")
         }
     });
 
@@ -268,8 +282,10 @@ fn check_cmd_optimization(instructions: &[DockerInstruction], findings: &mut Vec
     for instr in instructions {
         if instr.instruction == "CMD" || instr.instruction == "ENTRYPOINT" {
             let args = instr.arguments.to_lowercase();
-            if args.contains("npm start") || args.contains("npm run start")
-                || (args.contains("npm") && args.contains("start")) {
+            if args.contains("npm start")
+                || args.contains("npm run start")
+                || (args.contains("npm") && args.contains("start"))
+            {
                 findings.push(DockerFinding {
                     severity: DockerSeverity::Info,
                     title: "Using npm to start the application".to_string(),
@@ -278,7 +294,9 @@ fn check_cmd_optimization(instructions: &[DockerInstruction], findings: &mut Vec
                         startup and proper graceful shutdown."
                         .to_string(),
                     line_number: Some(instr.line_number),
-                    fix: "Use CMD [\"node\", \"dist/index.js\"] instead of CMD [\"npm\", \"start\"].".to_string(),
+                    fix:
+                        "Use CMD [\"node\", \"dist/index.js\"] instead of CMD [\"npm\", \"start\"]."
+                            .to_string(),
                 });
             }
         }
@@ -298,7 +316,8 @@ fn check_dockerignore(instructions: &[DockerInstruction], findings: &mut Vec<Doc
                 .git, and other unnecessary files to speed up the build context transfer."
                 .to_string(),
             line_number: None,
-            fix: "Create a .dockerignore with: node_modules, .git, *.md, .env, dist, coverage".to_string(),
+            fix: "Create a .dockerignore with: node_modules, .git, *.md, .env, dist, coverage"
+                .to_string(),
         });
     }
 }
@@ -321,10 +340,12 @@ fn check_run_consolidation(instructions: &[DockerInstruction], findings: &mut Ve
                     description: format!(
                         "Lines {}-{}: Multiple RUN instructions create separate layers. \
                         Combining them with '&&' reduces image size.",
-                        first_run_line, instr.line_number - 1
+                        first_run_line,
+                        instr.line_number - 1
                     ),
                     line_number: Some(first_run_line),
-                    fix: "Combine RUN instructions using '&&' and line continuations '\\'.".to_string(),
+                    fix: "Combine RUN instructions using '&&' and line continuations '\\'."
+                        .to_string(),
                 });
             }
             consecutive_runs = 0;
@@ -332,15 +353,20 @@ fn check_run_consolidation(instructions: &[DockerInstruction], findings: &mut Ve
     }
 }
 
-fn generate_optimized_dockerfile(instructions: &[DockerInstruction], findings: &[DockerFinding]) -> String {
-    let has_copy_before_install = findings.iter()
+fn generate_optimized_dockerfile(
+    instructions: &[DockerInstruction],
+    findings: &[DockerFinding],
+) -> String {
+    let has_copy_before_install = findings
+        .iter()
         .any(|f| f.title.contains("COPY . . before dependency install"));
-    let has_non_slim = findings.iter()
+    let has_non_slim = findings
+        .iter()
         .any(|f| f.title.contains("Non-slim base image"));
-    let has_no_multistage = findings.iter()
+    let has_no_multistage = findings
+        .iter()
         .any(|f| f.title.contains("No multi-stage build"));
-    let has_no_user = findings.iter()
-        .any(|f| f.title.contains("runs as root"));
+    let has_no_user = findings.iter().any(|f| f.title.contains("runs as root"));
 
     // Detect the ecosystem
     let is_node = instructions.iter().any(|i| {
@@ -397,7 +423,8 @@ fn generate_optimized_dockerfile(instructions: &[DockerInstruction], findings: &
 }
 
 fn generate_node_dockerfile(instructions: &[DockerInstruction]) -> String {
-    let base_image = instructions.iter()
+    let base_image = instructions
+        .iter()
         .find(|i| i.instruction == "FROM")
         .map(|i| {
             let img = i.arguments.split_whitespace().next().unwrap_or("node:20");
@@ -409,17 +436,20 @@ fn generate_node_dockerfile(instructions: &[DockerInstruction]) -> String {
         })
         .unwrap_or_else(|| "node:20-slim".to_string());
 
-    let workdir = instructions.iter()
+    let workdir = instructions
+        .iter()
         .find(|i| i.instruction == "WORKDIR")
         .map(|i| i.arguments.clone())
         .unwrap_or_else(|| "/app".to_string());
 
-    let expose = instructions.iter()
+    let expose = instructions
+        .iter()
         .find(|i| i.instruction == "EXPOSE")
         .map(|i| format!("EXPOSE {}", i.arguments))
         .unwrap_or_else(|| "EXPOSE 3000".to_string());
 
-    format!(r#"# Optimized by PipelineX — multi-stage Node.js build
+    format!(
+        r#"# Optimized by PipelineX — multi-stage Node.js build
 # Estimated build time: ~45s (cached), ~2:30 (cold)
 
 # Stage 1: Install dependencies
@@ -443,14 +473,23 @@ COPY --from=build {workdir}/package.json .
 {expose}
 USER node
 CMD ["node", "dist/index.js"]
-"#, base = base_image, workdir = workdir, expose = expose)
+"#,
+        base = base_image,
+        workdir = workdir,
+        expose = expose
+    )
 }
 
 fn generate_python_dockerfile(instructions: &[DockerInstruction]) -> String {
-    let base_image = instructions.iter()
+    let base_image = instructions
+        .iter()
         .find(|i| i.instruction == "FROM")
         .map(|i| {
-            let img = i.arguments.split_whitespace().next().unwrap_or("python:3.12");
+            let img = i
+                .arguments
+                .split_whitespace()
+                .next()
+                .unwrap_or("python:3.12");
             if img.contains("slim") || img.contains("alpine") {
                 img.to_string()
             } else {
@@ -459,7 +498,8 @@ fn generate_python_dockerfile(instructions: &[DockerInstruction]) -> String {
         })
         .unwrap_or_else(|| "python:3.12-slim".to_string());
 
-    format!(r#"# Optimized by PipelineX — Python multi-stage build
+    format!(
+        r#"# Optimized by PipelineX — Python multi-stage build
 
 # Stage 1: Install dependencies
 FROM {base} AS deps
@@ -478,7 +518,9 @@ RUN useradd -m appuser
 USER appuser
 EXPOSE 8000
 CMD ["python", "-m", "gunicorn", "app:app", "--bind", "0.0.0.0:8000"]
-"#, base = base_image)
+"#,
+        base = base_image
+    )
 }
 
 fn generate_go_dockerfile(_instructions: &[DockerInstruction]) -> String {
@@ -498,7 +540,8 @@ COPY --from=build /app/server /server
 EXPOSE 8080
 USER nonroot
 ENTRYPOINT ["/server"]
-"#.to_string()
+"#
+    .to_string()
 }
 
 fn estimate_build_time(instructions: &[DockerInstruction], optimized: bool) -> f64 {
@@ -543,9 +586,18 @@ RUN npm run build
 CMD ["npm", "start"]
 "#;
         let analysis = analyze_dockerfile(dockerfile);
-        assert!(analysis.findings.iter().any(|f| f.title.contains("COPY . . before")));
-        assert!(analysis.findings.iter().any(|f| f.title.contains("Non-slim")));
-        assert!(analysis.findings.iter().any(|f| f.title.contains("runs as root")));
+        assert!(analysis
+            .findings
+            .iter()
+            .any(|f| f.title.contains("COPY . . before")));
+        assert!(analysis
+            .findings
+            .iter()
+            .any(|f| f.title.contains("Non-slim")));
+        assert!(analysis
+            .findings
+            .iter()
+            .any(|f| f.title.contains("runs as root")));
         assert!(analysis.findings.iter().any(|f| f.title.contains("npm")));
         assert!(analysis.optimized_dockerfile.is_some());
     }
@@ -588,7 +640,9 @@ CMD ["node", "dist/index.js"]
 "#;
         let analysis = analyze_dockerfile(dockerfile);
         // Should have fewer critical findings
-        let critical = analysis.findings.iter()
+        let critical = analysis
+            .findings
+            .iter()
             .filter(|f| matches!(f.severity, DockerSeverity::Critical))
             .count();
         assert_eq!(critical, 0);

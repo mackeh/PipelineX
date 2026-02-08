@@ -2,16 +2,16 @@ mod display;
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
+use pipelinex_core::analyzer;
+use pipelinex_core::flaky_detector::FlakyDetector;
+use pipelinex_core::optimizer::Optimizer;
+use pipelinex_core::parser::bitbucket::BitbucketParser;
+use pipelinex_core::parser::circleci::CircleCIParser;
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
 use pipelinex_core::parser::jenkins::JenkinsParser;
-use pipelinex_core::parser::circleci::CircleCIParser;
-use pipelinex_core::parser::bitbucket::BitbucketParser;
-use pipelinex_core::analyzer;
-use pipelinex_core::optimizer::Optimizer;
-use pipelinex_core::test_selector::TestSelector;
-use pipelinex_core::flaky_detector::FlakyDetector;
 use pipelinex_core::providers::GitHubClient;
+use pipelinex_core::test_selector::TestSelector;
 use std::path::{Path, PathBuf};
 
 #[derive(Parser)]
@@ -194,52 +194,71 @@ async fn main() -> Result<()> {
         Commands::Analyze { path, format } => cmd_analyze(&path, &format),
         Commands::Optimize { path, output, diff } => cmd_optimize(&path, output.as_deref(), diff),
         Commands::Diff { path } => cmd_diff(&path),
-        Commands::Cost { path, runs_per_month, team_size, hourly_rate } => {
-            cmd_cost(&path, runs_per_month, team_size, hourly_rate)
-        }
-        Commands::Graph { path, format, output } => {
-            cmd_graph(&path, &format, output.as_deref())
-        }
-        Commands::Simulate { path, runs, variance, format } => {
-            cmd_simulate(&path, runs, variance, &format)
-        }
-        Commands::Docker { path, optimize, output } => {
-            cmd_docker(&path, optimize, output.as_deref())
-        }
-        Commands::SelectTests { base, head, repo, format } => {
-            cmd_select_tests(&base, &head, repo.as_deref(), &format)
-        }
-        Commands::Flaky { paths, min_runs, threshold, format } => {
-            cmd_flaky(&paths, min_runs, threshold, &format)
-        }
-        Commands::History { repo, workflow, runs, token, format } => {
-            cmd_history(&repo, &workflow, runs, token, &format).await
-        }
+        Commands::Cost {
+            path,
+            runs_per_month,
+            team_size,
+            hourly_rate,
+        } => cmd_cost(&path, runs_per_month, team_size, hourly_rate),
+        Commands::Graph {
+            path,
+            format,
+            output,
+        } => cmd_graph(&path, &format, output.as_deref()),
+        Commands::Simulate {
+            path,
+            runs,
+            variance,
+            format,
+        } => cmd_simulate(&path, runs, variance, &format),
+        Commands::Docker {
+            path,
+            optimize,
+            output,
+        } => cmd_docker(&path, optimize, output.as_deref()),
+        Commands::SelectTests {
+            base,
+            head,
+            repo,
+            format,
+        } => cmd_select_tests(&base, &head, repo.as_deref(), &format),
+        Commands::Flaky {
+            paths,
+            min_runs,
+            threshold,
+            format,
+        } => cmd_flaky(&paths, min_runs, threshold, &format),
+        Commands::History {
+            repo,
+            workflow,
+            runs,
+            token,
+            format,
+        } => cmd_history(&repo, &workflow, runs, token, &format).await,
     }
 }
 
 /// Detect CI provider from file path and parse accordingly.
 fn parse_pipeline(path: &std::path::Path) -> Result<pipelinex_core::PipelineDag> {
-    let filename = path.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+    let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     let path_str = path.to_string_lossy().to_lowercase();
 
-    if filename == ".gitlab-ci.yml" || filename == ".gitlab-ci.yaml"
-        || path_str.contains("gitlab")
+    if filename == ".gitlab-ci.yml" || filename == ".gitlab-ci.yaml" || path_str.contains("gitlab")
     {
         GitLabCIParser::parse_file(path)
             .with_context(|| format!("Failed to parse GitLab CI file: {}", path.display()))
-    } else if filename == "Jenkinsfile" || filename.ends_with(".jenkinsfile")
-        || filename.ends_with(".groovy") || path_str.contains("jenkins")
+    } else if filename == "Jenkinsfile"
+        || filename.ends_with(".jenkinsfile")
+        || filename.ends_with(".groovy")
+        || path_str.contains("jenkins")
     {
         JenkinsParser::parse_file(path)
             .with_context(|| format!("Failed to parse Jenkinsfile: {}", path.display()))
-    } else if path_str.contains("circleci") || path_str.contains(".circleci")
-    {
+    } else if path_str.contains("circleci") || path_str.contains(".circleci") {
         CircleCIParser::parse_file(path)
             .with_context(|| format!("Failed to parse CircleCI config: {}", path.display()))
-    } else if filename == "bitbucket-pipelines.yml" || filename == "bitbucket-pipelines.yaml"
+    } else if filename == "bitbucket-pipelines.yml"
+        || filename == "bitbucket-pipelines.yaml"
         || path_str.contains("bitbucket")
     {
         BitbucketParser::parse_file(path)
@@ -262,7 +281,7 @@ fn discover_workflow_files(path: &Path) -> Result<Vec<PathBuf>> {
             .context("Failed to read glob pattern")?
             .chain(
                 glob::glob(&format!("{}/**/*.yaml", path.display()))
-                    .context("Failed to read glob pattern")?
+                    .context("Failed to read glob pattern")?,
             )
             .filter_map(|r| r.ok())
             .collect();
@@ -299,7 +318,8 @@ fn cmd_analyze(path: &Path, format: &str) -> Result<()> {
                 println!("{}", json);
             }
             "html" => {
-                let html = pipelinex_core::analyzer::html_report::generate_html_report(&report, &dag);
+                let html =
+                    pipelinex_core::analyzer::html_report::generate_html_report(&report, &dag);
                 println!("{}", html);
             }
             _ => {
@@ -313,7 +333,10 @@ fn cmd_analyze(path: &Path, format: &str) -> Result<()> {
 
 fn cmd_optimize(path: &PathBuf, output: Option<&std::path::Path>, show_diff: bool) -> Result<()> {
     if !path.is_file() {
-        anyhow::bail!("'{}' is not a file. Optimize requires a single workflow file.", path.display());
+        anyhow::bail!(
+            "'{}' is not a file. Optimize requires a single workflow file.",
+            path.display()
+        );
     }
 
     let dag = parse_pipeline(path)?;
@@ -329,10 +352,7 @@ fn cmd_optimize(path: &PathBuf, output: Option<&std::path::Path>, show_diff: boo
     match output {
         Some(out_path) => {
             std::fs::write(out_path, &optimized)?;
-            println!(
-                "Optimized config written to {}",
-                out_path.display()
-            );
+            println!("Optimized config written to {}", out_path.display());
         }
         None => {
             print!("{}", optimized);
@@ -357,7 +377,9 @@ fn cmd_cost(path: &Path, runs_per_month: u32, team_size: u32, hourly_rate: f64) 
         let dag = parse_pipeline(file)?;
         let report = analyzer::analyze(&dag);
 
-        let runner_type = dag.graph.node_weights()
+        let runner_type = dag
+            .graph
+            .node_weights()
             .next()
             .map(|j| j.runs_on.as_str())
             .unwrap_or("ubuntu-latest");
@@ -472,7 +494,11 @@ fn cmd_select_tests(
             }
 
             let output = Output {
-                changed_files: selection.changed_files.iter().map(|p| p.display().to_string()).collect(),
+                changed_files: selection
+                    .changed_files
+                    .iter()
+                    .map(|p| p.display().to_string())
+                    .collect(),
                 selected_tests: selection.selected_tests,
                 test_patterns: selection.test_patterns,
                 selection_ratio: selection.selection_ratio,
@@ -493,7 +519,11 @@ fn cmd_select_tests(
             }
 
             let output = Output {
-                changed_files: selection.changed_files.iter().map(|p| p.display().to_string()).collect(),
+                changed_files: selection
+                    .changed_files
+                    .iter()
+                    .map(|p| p.display().to_string())
+                    .collect(),
                 selected_tests: selection.selected_tests,
                 test_patterns: selection.test_patterns,
                 selection_ratio: selection.selection_ratio,
@@ -511,12 +541,7 @@ fn cmd_select_tests(
     Ok(())
 }
 
-fn cmd_flaky(
-    paths: &[PathBuf],
-    min_runs: usize,
-    threshold: f64,
-    format: &str,
-) -> Result<()> {
+fn cmd_flaky(paths: &[PathBuf], min_runs: usize, threshold: f64, format: &str) -> Result<()> {
     if paths.is_empty() {
         anyhow::bail!("No paths provided. Specify JUnit XML files or directories.");
     }
@@ -590,8 +615,7 @@ async fn cmd_history(
     println!();
 
     // Create GitHub API client
-    let client = GitHubClient::new(api_token)
-        .context("Failed to create GitHub API client")?;
+    let client = GitHubClient::new(api_token).context("Failed to create GitHub API client")?;
 
     // Fetch and analyze workflow history
     let stats = client

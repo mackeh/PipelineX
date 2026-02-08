@@ -47,11 +47,11 @@ pub struct HealthScore {
 /// Health grade categories
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HealthGrade {
-    Excellent,  // 90-100
-    Good,       // 75-89
-    Fair,       // 60-74
-    Poor,       // 40-59
-    Critical,   // 0-39
+    Excellent, // 90-100
+    Good,      // 75-89
+    Fair,      // 60-74
+    Poor,      // 40-59
+    Critical,  // 0-39
 }
 
 impl Default for HealthScoreWeights {
@@ -204,28 +204,27 @@ impl HealthScoreCalculator {
 
         // Caching
         if caching_score < 50.0 {
-            recommendations.push(
-                "🟡 Add caching for dependencies to reduce build times".to_string(),
-            );
+            recommendations
+                .push("🟡 Add caching for dependencies to reduce build times".to_string());
         }
 
         // Parallelization
         if parallelization_score < 50.0 {
-            recommendations.push(
-                "🟡 Increase parallelization - many jobs could run concurrently".to_string(),
-            );
+            recommendations
+                .push("🟡 Increase parallelization - many jobs could run concurrently".to_string());
         }
 
         // General improvement
         if issue_score < 80.0 && recommendations.is_empty() {
-            recommendations.push(
-                "💡 Run 'pipelinex optimize' to generate improved configuration".to_string(),
-            );
+            recommendations
+                .push("💡 Run 'pipelinex optimize' to generate improved configuration".to_string());
         }
 
         // If everything is good
         if recommendations.is_empty() {
-            recommendations.push("✅ Pipeline is well-optimized! Keep monitoring for regressions.".to_string());
+            recommendations.push(
+                "✅ Pipeline is well-optimized! Keep monitoring for regressions.".to_string(),
+            );
         }
 
         recommendations
@@ -263,7 +262,9 @@ impl HealthGrade {
         match self {
             HealthGrade::Excellent => "Pipeline is excellently optimized with minimal issues",
             HealthGrade::Good => "Pipeline performs well with minor room for improvement",
-            HealthGrade::Fair => "Pipeline is functional but has notable optimization opportunities",
+            HealthGrade::Fair => {
+                "Pipeline is functional but has notable optimization opportunities"
+            }
             HealthGrade::Poor => "Pipeline has significant performance issues requiring attention",
             HealthGrade::Critical => "Pipeline requires immediate optimization",
         }
@@ -278,14 +279,14 @@ mod tests {
     fn test_perfect_score() {
         let calculator = HealthScoreCalculator::new();
         let score = calculator.calculate(
-            300.0,   // duration
-            300.0,   // optimal
-            1.0,     // 100% success rate
-            1.0,     // fully parallel
-            true,    // has caching
-            0,       // no critical issues
-            0,       // no high issues
-            0,       // no medium issues
+            300.0, // duration
+            300.0, // optimal
+            1.0,   // 100% success rate
+            1.0,   // fully parallel
+            true,  // has caching
+            0,     // no critical issues
+            0,     // no high issues
+            0,     // no medium issues
         );
 
         assert!(score.total_score >= 95.0);
@@ -296,27 +297,45 @@ mod tests {
     fn test_poor_score() {
         let calculator = HealthScoreCalculator::new();
         let score = calculator.calculate(
-            1800.0,  // 30 min duration
-            300.0,   // 5 min optimal
-            0.7,     // 70% success rate
-            0.2,     // mostly serial
-            false,   // no caching
-            3,       // 3 critical issues
-            5,       // 5 high issues
-            10,      // 10 medium issues
+            1800.0, // 30 min duration
+            300.0,  // 5 min optimal
+            0.7,    // 70% success rate
+            0.2,    // mostly serial
+            false,  // no caching
+            3,      // 3 critical issues
+            5,      // 5 high issues
+            10,     // 10 medium issues
         );
 
         assert!(score.total_score < 50.0);
-        assert!(matches!(score.grade, HealthGrade::Poor | HealthGrade::Critical));
+        assert!(matches!(
+            score.grade,
+            HealthGrade::Poor | HealthGrade::Critical
+        ));
         assert!(!score.recommendations.is_empty());
     }
 
     #[test]
     fn test_grade_assignment() {
-        assert_eq!(HealthScoreCalculator::score_to_grade(95.0), HealthGrade::Excellent);
-        assert_eq!(HealthScoreCalculator::score_to_grade(85.0), HealthGrade::Good);
-        assert_eq!(HealthScoreCalculator::score_to_grade(65.0), HealthGrade::Fair);
-        assert_eq!(HealthScoreCalculator::score_to_grade(45.0), HealthGrade::Poor);
-        assert_eq!(HealthScoreCalculator::score_to_grade(25.0), HealthGrade::Critical);
+        assert_eq!(
+            HealthScoreCalculator::score_to_grade(95.0),
+            HealthGrade::Excellent
+        );
+        assert_eq!(
+            HealthScoreCalculator::score_to_grade(85.0),
+            HealthGrade::Good
+        );
+        assert_eq!(
+            HealthScoreCalculator::score_to_grade(65.0),
+            HealthGrade::Fair
+        );
+        assert_eq!(
+            HealthScoreCalculator::score_to_grade(45.0),
+            HealthGrade::Poor
+        );
+        assert_eq!(
+            HealthScoreCalculator::score_to_grade(25.0),
+            HealthGrade::Critical
+        );
     }
 }

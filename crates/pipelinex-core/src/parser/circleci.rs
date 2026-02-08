@@ -1,4 +1,4 @@
-use crate::parser::dag::{PipelineDag, JobNode, StepInfo, CacheConfig};
+use crate::parser::dag::{CacheConfig, JobNode, PipelineDag, StepInfo};
 use anyhow::{Context, Result};
 use serde_yaml::Value;
 use std::collections::HashMap;
@@ -17,8 +17,7 @@ impl CircleCIParser {
 
     /// Parse a CircleCI config from string content.
     pub fn parse(content: &str, source: String) -> Result<PipelineDag> {
-        let yaml: Value = serde_yaml::from_str(content)
-            .context("Failed to parse CircleCI YAML")?;
+        let yaml: Value = serde_yaml::from_str(content).context("Failed to parse CircleCI YAML")?;
 
         let mut dag = PipelineDag::new(
             "CircleCI Pipeline".to_string(),
@@ -27,7 +26,8 @@ impl CircleCIParser {
         );
 
         // Extract jobs from the config
-        let jobs = yaml.get("jobs")
+        let jobs = yaml
+            .get("jobs")
             .and_then(|j| j.as_mapping())
             .context("No jobs found in CircleCI config")?;
 
@@ -97,7 +97,9 @@ impl CircleCIParser {
                     if let Some(cmd) = run.as_str() {
                         Some(cmd.to_string())
                     } else {
-                        run.get("command").and_then(|c| c.as_str()).map(String::from)
+                        run.get("command")
+                            .and_then(|c| c.as_str())
+                            .map(String::from)
                     }
                 } else {
                     None
@@ -221,10 +223,7 @@ impl CircleCIParser {
         caches
     }
 
-    fn parse_workflow_dependencies(
-        dag: &mut PipelineDag,
-        workflow_jobs: &[Value],
-    ) -> Result<()> {
+    fn parse_workflow_dependencies(dag: &mut PipelineDag, workflow_jobs: &[Value]) -> Result<()> {
         for job_entry in workflow_jobs {
             // Jobs can be strings or mappings with "requires"
             let (job_name, requires) = if let Some(name) = job_entry.as_str() {

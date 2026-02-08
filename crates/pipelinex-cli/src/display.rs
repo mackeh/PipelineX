@@ -1,10 +1,10 @@
 use colored::*;
-use pipelinex_core::analyzer::report::{AnalysisReport, Finding, Severity, format_duration};
+use pipelinex_core::analyzer::report::{format_duration, AnalysisReport, Finding, Severity};
 use pipelinex_core::cost::CostEstimate;
-use pipelinex_core::simulator::SimulationResult;
+use pipelinex_core::flaky_detector::{FlakyCategory, FlakyReport};
 use pipelinex_core::optimizer::docker_opt::{DockerAnalysis, DockerSeverity};
+use pipelinex_core::simulator::SimulationResult;
 use pipelinex_core::test_selector::TestSelection;
-use pipelinex_core::flaky_detector::{FlakyReport, FlakyCategory};
 use similar::{ChangeTag, TextDiff};
 use std::path::{Path, PathBuf};
 
@@ -13,7 +13,12 @@ pub fn print_analysis_report(report: &AnalysisReport) {
     println!();
     println!(
         "{}",
-        format!(" PipelineX v{} — Analyzing {}", env!("CARGO_PKG_VERSION"), report.source_file).bold()
+        format!(
+            " PipelineX v{} — Analyzing {}",
+            env!("CARGO_PKG_VERSION"),
+            report.source_file
+        )
+        .bold()
     );
     println!();
 
@@ -36,11 +41,7 @@ pub fn print_analysis_report(report: &AnalysisReport) {
         report.critical_path.join(" -> "),
         format_duration(report.critical_path_duration_secs)
     );
-    println!(
-        " {} Provider: {}",
-        "|-".dimmed(),
-        report.provider.cyan()
-    );
+    println!(" {} Provider: {}", "|-".dimmed(), report.provider.cyan());
     println!();
 
     // Separator
@@ -136,11 +137,27 @@ pub fn print_analysis_report(report: &AnalysisReport) {
 
 fn print_finding(finding: &Finding) {
     let severity_tag = match finding.severity {
-        Severity::Critical => format!(" {} ", finding.severity.symbol()).on_red().white().bold().to_string(),
-        Severity::High => format!(" {} ", finding.severity.symbol()).on_yellow().black().bold().to_string(),
-        Severity::Medium => format!(" {} ", finding.severity.symbol()).on_blue().white().bold().to_string(),
-        Severity::Low => format!(" {} ", finding.severity.symbol()).dimmed().to_string(),
-        Severity::Info => format!(" {} ", finding.severity.symbol()).dimmed().to_string(),
+        Severity::Critical => format!(" {} ", finding.severity.symbol())
+            .on_red()
+            .white()
+            .bold()
+            .to_string(),
+        Severity::High => format!(" {} ", finding.severity.symbol())
+            .on_yellow()
+            .black()
+            .bold()
+            .to_string(),
+        Severity::Medium => format!(" {} ", finding.severity.symbol())
+            .on_blue()
+            .white()
+            .bold()
+            .to_string(),
+        Severity::Low => format!(" {} ", finding.severity.symbol())
+            .dimmed()
+            .to_string(),
+        Severity::Info => format!(" {} ", finding.severity.symbol())
+            .dimmed()
+            .to_string(),
     };
 
     println!(" {} {}", severity_tag, finding.title.bold());
@@ -175,10 +192,7 @@ fn print_finding(finding: &Finding) {
 /// Print a diff between original and optimized pipeline.
 pub fn print_diff(original: &str, optimized: &str, filename: &str) {
     println!();
-    println!(
-        "{}",
-        format!(" PipelineX — Diff for {}", filename).bold()
-    );
+    println!("{}", format!(" PipelineX — Diff for {}", filename).bold());
     println!();
 
     let diff = TextDiff::from_lines(original, optimized);
@@ -201,7 +215,10 @@ pub fn print_diff(original: &str, optimized: &str, filename: &str) {
     }
 
     if !has_changes {
-        println!(" {}", "No changes needed — pipeline is already well-optimized!".green());
+        println!(
+            " {}",
+            "No changes needed — pipeline is already well-optimized!".green()
+        );
     }
     println!();
 }
@@ -279,9 +296,12 @@ pub fn print_cost_report(
     );
     println!(
         "   Annual savings:               {}",
-        format!("${:.0}", (recoverable_compute + recoverable_dev_hours * 150.0) * 12.0)
-            .green()
-            .bold()
+        format!(
+            "${:.0}",
+            (recoverable_compute + recoverable_dev_hours * 150.0) * 12.0
+        )
+        .green()
+        .bold()
     );
     println!();
 }
@@ -291,24 +311,22 @@ pub fn print_simulation_report(pipeline_name: &str, result: &SimulationResult) {
     println!();
     println!(
         "{}",
-        format!(" PipelineX Simulation — {} ({} runs)", pipeline_name, result.runs).bold()
+        format!(
+            " PipelineX Simulation — {} ({} runs)",
+            pipeline_name, result.runs
+        )
+        .bold()
     );
     println!();
 
     // Duration distribution
     println!(" {}", "Duration Distribution".bold().underline());
-    println!(
-        "   Min:     {}",
-        format_duration(result.min_duration_secs)
-    );
+    println!("   Min:     {}", format_duration(result.min_duration_secs));
     println!(
         "   p50:     {}",
         format_duration(result.p50_duration_secs).green()
     );
-    println!(
-        "   p75:     {}",
-        format_duration(result.p75_duration_secs)
-    );
+    println!("   p75:     {}", format_duration(result.p75_duration_secs));
     println!(
         "   p90:     {}",
         format_duration(result.p90_duration_secs).yellow()
@@ -317,10 +335,7 @@ pub fn print_simulation_report(pipeline_name: &str, result: &SimulationResult) {
         "   p99:     {}",
         format_duration(result.p99_duration_secs).red()
     );
-    println!(
-        "   Max:     {}",
-        format_duration(result.max_duration_secs)
-    );
+    println!("   Max:     {}", format_duration(result.max_duration_secs));
     println!(
         "   Mean:    {} (std dev: {})",
         format_duration(result.mean_duration_secs),
@@ -356,9 +371,13 @@ pub fn print_simulation_report(pipeline_name: &str, result: &SimulationResult) {
         );
         for job in &result.job_stats {
             let crit_color = if job.on_critical_path_pct > 80.0 {
-                format!("{:.0}%", job.on_critical_path_pct).red().to_string()
+                format!("{:.0}%", job.on_critical_path_pct)
+                    .red()
+                    .to_string()
             } else if job.on_critical_path_pct > 50.0 {
-                format!("{:.0}%", job.on_critical_path_pct).yellow().to_string()
+                format!("{:.0}%", job.on_critical_path_pct)
+                    .yellow()
+                    .to_string()
             } else {
                 format!("{:.0}%", job.on_critical_path_pct)
             };
@@ -434,7 +453,11 @@ pub fn print_test_selection(selection: &TestSelection) {
     println!();
     println!(
         "{}",
-        format!(" PipelineX v{} — Smart Test Selection", env!("CARGO_PKG_VERSION")).bold()
+        format!(
+            " PipelineX v{} — Smart Test Selection",
+            env!("CARGO_PKG_VERSION")
+        )
+        .bold()
     );
     println!();
 
@@ -447,7 +470,11 @@ pub fn print_test_selection(selection: &TestSelection) {
             if i < 10 {
                 println!(" {} {}", "|-".dimmed(), file.display());
             } else if i == 10 {
-                println!(" {} ... ({} more files)", "|-".dimmed(), selection.changed_files.len() - 10);
+                println!(
+                    " {} ... ({} more files)",
+                    "|-".dimmed(),
+                    selection.changed_files.len() - 10
+                );
                 break;
             }
         }
@@ -457,7 +484,10 @@ pub fn print_test_selection(selection: &TestSelection) {
     // Selected tests
     println!(" {}", "Selected Tests".bold().underline());
     if selection.selected_tests.is_empty() {
-        println!(" {} No specific tests selected — run all tests", "|".dimmed());
+        println!(
+            " {} No specific tests selected — run all tests",
+            "|".dimmed()
+        );
     } else if selection.selected_tests.contains(&"all".to_string()) {
         println!(
             " {} {} Critical changes detected — running all tests",
@@ -494,7 +524,10 @@ pub fn print_test_selection(selection: &TestSelection) {
             (1.0 - selection.selection_ratio) * 100.0
         );
     } else {
-        println!(" {} No tests selected — changes may not affect test code", "|-".dimmed());
+        println!(
+            " {} No tests selected — changes may not affect test code",
+            "|-".dimmed()
+        );
     }
     println!();
 
@@ -511,11 +544,13 @@ pub fn print_test_selection(selection: &TestSelection) {
     println!(" {}", "=".repeat(60).dimmed());
     println!();
     println!(" {} Integration with CI:", "Tip".green().bold());
-    println!("  {} Use {} to get patterns as JSON/YAML",
+    println!(
+        "  {} Use {} to get patterns as JSON/YAML",
         "|".dimmed(),
         "pipelinex select-tests --format json".cyan()
     );
-    println!("  {} Configure your CI to run only the selected test patterns",
+    println!(
+        "  {} Configure your CI to run only the selected test patterns",
         "|".dimmed()
     );
     println!();
@@ -526,7 +561,11 @@ pub fn print_flaky_report(report: &FlakyReport, files: &[PathBuf]) {
     println!();
     println!(
         "{}",
-        format!(" PipelineX v{} — Flaky Test Detector", env!("CARGO_PKG_VERSION")).bold()
+        format!(
+            " PipelineX v{} — Flaky Test Detector",
+            env!("CARGO_PKG_VERSION")
+        )
+        .bold()
     );
     println!();
 
@@ -544,7 +583,11 @@ pub fn print_flaky_report(report: &FlakyReport, files: &[PathBuf]) {
 
     // Summary
     println!(" {}", "Detection Summary".bold().underline());
-    println!(" {} Total tests analyzed: {}", "|-".dimmed(), report.total_tests);
+    println!(
+        " {} Total tests analyzed: {}",
+        "|-".dimmed(),
+        report.total_tests
+    );
     println!(
         " {} Flaky tests found: {}",
         "|-".dimmed(),
@@ -571,7 +614,11 @@ pub fn print_flaky_report(report: &FlakyReport, files: &[PathBuf]) {
     println!();
 
     if report.flaky_tests.is_empty() {
-        println!(" {} {}", "✓".green().bold(), "No flaky tests detected! All tests are stable.".green());
+        println!(
+            " {} {}",
+            "✓".green().bold(),
+            "No flaky tests detected! All tests are stable.".green()
+        );
         println!();
         return;
     }
@@ -582,7 +629,10 @@ pub fn print_flaky_report(report: &FlakyReport, files: &[PathBuf]) {
 
     for (i, test) in report.flaky_tests.iter().enumerate() {
         if i >= 20 {
-            println!(" ... and {} more flaky tests", report.flaky_tests.len() - 20);
+            println!(
+                " ... and {} more flaky tests",
+                report.flaky_tests.len() - 20
+            );
             break;
         }
 
@@ -595,7 +645,11 @@ pub fn print_flaky_report(report: &FlakyReport, files: &[PathBuf]) {
             score_display.normal()
         };
 
-        println!(" {} Flakiness: {}", "FLAKY".on_red().white().bold(), score_colored);
+        println!(
+            " {} Flakiness: {}",
+            "FLAKY".on_red().white().bold(),
+            score_colored
+        );
         println!("   {} {}", "|".dimmed(), test.name.bold());
         println!(
             "   {} Category: {}",
@@ -603,7 +657,8 @@ pub fn print_flaky_report(report: &FlakyReport, files: &[PathBuf]) {
             match test.category {
                 FlakyCategory::Intermittent => "Intermittent (< 50% failure rate)".yellow(),
                 FlakyCategory::Unstable => "Unstable (alternating pass/fail)".red(),
-                FlakyCategory::EnvironmentSensitive => "Environment-Sensitive (network, timeouts)".cyan(),
+                FlakyCategory::EnvironmentSensitive =>
+                    "Environment-Sensitive (network, timeouts)".cyan(),
                 FlakyCategory::TimingDependent => "Timing-Dependent (race conditions)".magenta(),
             }
         );
@@ -638,18 +693,32 @@ pub fn print_flaky_report(report: &FlakyReport, files: &[PathBuf]) {
 
     // Recommendations
     println!(" {}", "Recommendations".bold().underline());
-    println!(" {} Quarantine flaky tests to prevent blocking CI", "|-".dimmed());
-    println!(" {} Investigate timing-dependent tests for race conditions", "|-".dimmed());
-    println!(" {} Add retries for environment-sensitive tests", "|-".dimmed());
-    println!(" {} Track flakiness over time to identify trends", "|-".dimmed());
+    println!(
+        " {} Quarantine flaky tests to prevent blocking CI",
+        "|-".dimmed()
+    );
+    println!(
+        " {} Investigate timing-dependent tests for race conditions",
+        "|-".dimmed()
+    );
+    println!(
+        " {} Add retries for environment-sensitive tests",
+        "|-".dimmed()
+    );
+    println!(
+        " {} Track flakiness over time to identify trends",
+        "|-".dimmed()
+    );
     println!();
 
     println!(" {} Next steps:", "Tip".green().bold());
-    println!("  {} Run {} to get JSON output",
+    println!(
+        "  {} Run {} to get JSON output",
         "|".dimmed(),
         "pipelinex flaky <path> --format json".cyan()
     );
-    println!("  {} Integrate with your CI to automatically detect new flaky tests",
+    println!(
+        "  {} Integrate with your CI to automatically detect new flaky tests",
         "|".dimmed()
     );
     println!();
@@ -661,22 +730,45 @@ pub fn print_history_stats(stats: &PipelineStatistics) {
     use colored::Colorize;
 
     println!("{}", "━".repeat(70).bright_black());
-    println!("{}", format!("📊 Pipeline History: {}", stats.workflow_name).bold().cyan());
+    println!(
+        "{}",
+        format!("📊 Pipeline History: {}", stats.workflow_name)
+            .bold()
+            .cyan()
+    );
     println!("{}", "━".repeat(70).bright_black());
     println!();
 
     // Overall statistics
     println!("{}", " Overall Statistics".bold());
-    println!("   Total runs analyzed:  {}", stats.total_runs.to_string().yellow());
-    println!("   Success rate:         {:.1}%", (stats.success_rate * 100.0).to_string().green());
+    println!(
+        "   Total runs analyzed:  {}",
+        stats.total_runs.to_string().yellow()
+    );
+    println!(
+        "   Success rate:         {:.1}%",
+        (stats.success_rate * 100.0).to_string().green()
+    );
     println!();
 
     // Duration statistics
     println!("{}", " Duration Statistics".bold());
-    println!("   Average:   {}", format_duration(stats.avg_duration_sec).yellow());
-    println!("   Median:    {}", format_duration(stats.p50_duration_sec).yellow());
-    println!("   P90:       {}", format_duration(stats.p90_duration_sec).yellow());
-    println!("   P99:       {}", format_duration(stats.p99_duration_sec).yellow());
+    println!(
+        "   Average:   {}",
+        format_duration(stats.avg_duration_sec).yellow()
+    );
+    println!(
+        "   Median:    {}",
+        format_duration(stats.p50_duration_sec).yellow()
+    );
+    println!(
+        "   P90:       {}",
+        format_duration(stats.p90_duration_sec).yellow()
+    );
+    println!(
+        "   P99:       {}",
+        format_duration(stats.p99_duration_sec).yellow()
+    );
     println!();
 
     // Job-level statistics
@@ -704,19 +796,22 @@ pub fn print_history_stats(stats: &PipelineStatistics) {
             };
 
             println!("   {}", job_label);
-            println!("      Average: {} | P50: {} | P90: {}",
+            println!(
+                "      Average: {} | P50: {} | P90: {}",
                 format_duration(job.avg_duration_sec).bright_white(),
                 format_duration(job.p50_duration_sec).bright_black(),
                 format_duration(job.p90_duration_sec).bright_black()
             );
-            println!("      Runs: {} | Success rate: {:.1}%",
+            println!(
+                "      Runs: {} | Success rate: {:.1}%",
                 total_runs.to_string().bright_black(),
                 format!("{:.1}", success_rate)
             );
 
             // Show variance indicator
             if job.variance > 4.0 {
-                println!("      ⚠️  {} (high variance detected)",
+                println!(
+                    "      ⚠️  {} (high variance detected)",
                     "Unstable timing".yellow()
                 );
             }
@@ -740,25 +835,25 @@ pub fn print_history_stats(stats: &PipelineStatistics) {
 
     // Provide insights
     if stats.p90_duration_sec > stats.avg_duration_sec * 1.5 {
-        println!("   {} P90 is significantly higher than average",
-            "🔴".red()
-        );
+        println!("   {} P90 is significantly higher than average", "🔴".red());
         println!("      This indicates high variance in pipeline duration.");
         println!("      Consider investigating slow runs for bottlenecks.");
         println!();
     }
 
     if stats.success_rate < 0.9 {
-        println!("   {} Success rate below 90%",
-            "🔴".red()
-        );
+        println!("   {} Success rate below 90%", "🔴".red());
         let failure_pct = format!("{:.0}%", (1.0 - stats.success_rate) * 100.0);
-        println!("      {} of runs fail. Identify and fix flaky tests or unstable jobs.", failure_pct);
+        println!(
+            "      {} of runs fail. Identify and fix flaky tests or unstable jobs.",
+            failure_pct
+        );
         println!();
     }
 
     if !stats.flaky_jobs.is_empty() {
-        println!("   {} {} potentially flaky jobs detected",
+        println!(
+            "   {} {} potentially flaky jobs detected",
             "🟡".yellow(),
             stats.flaky_jobs.len()
         );
@@ -775,4 +870,3 @@ pub fn print_history_stats(stats: &PipelineStatistics) {
     println!("   • Validate that optimizations reduced duration");
     println!();
 }
-

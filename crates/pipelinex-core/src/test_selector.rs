@@ -36,38 +36,42 @@ impl Default for TestSelectorConfig {
         let mut test_patterns = HashMap::new();
 
         // Common test patterns by language
-        test_patterns.insert("rust".to_string(), vec![
-            "**/*_test.rs".to_string(),
-            "**/tests/**/*.rs".to_string(),
-        ]);
+        test_patterns.insert(
+            "rust".to_string(),
+            vec!["**/*_test.rs".to_string(), "**/tests/**/*.rs".to_string()],
+        );
 
-        test_patterns.insert("javascript".to_string(), vec![
-            "**/*.test.js".to_string(),
-            "**/*.spec.js".to_string(),
-            "**/__tests__/**/*.js".to_string(),
-        ]);
+        test_patterns.insert(
+            "javascript".to_string(),
+            vec![
+                "**/*.test.js".to_string(),
+                "**/*.spec.js".to_string(),
+                "**/__tests__/**/*.js".to_string(),
+            ],
+        );
 
-        test_patterns.insert("typescript".to_string(), vec![
-            "**/*.test.ts".to_string(),
-            "**/*.spec.ts".to_string(),
-            "**/__tests__/**/*.ts".to_string(),
-        ]);
+        test_patterns.insert(
+            "typescript".to_string(),
+            vec![
+                "**/*.test.ts".to_string(),
+                "**/*.spec.ts".to_string(),
+                "**/__tests__/**/*.ts".to_string(),
+            ],
+        );
 
-        test_patterns.insert("python".to_string(), vec![
-            "**/test_*.py".to_string(),
-            "**/*_test.py".to_string(),
-            "**/tests/**/*.py".to_string(),
-        ]);
+        test_patterns.insert(
+            "python".to_string(),
+            vec![
+                "**/test_*.py".to_string(),
+                "**/*_test.py".to_string(),
+                "**/tests/**/*.py".to_string(),
+            ],
+        );
 
-        test_patterns.insert("go".to_string(), vec![
-            "**/*_test.go".to_string(),
-        ]);
+        test_patterns.insert("go".to_string(), vec!["**/*_test.go".to_string()]);
 
         Self {
-            always_run: vec![
-                "e2e".to_string(),
-                "integration".to_string(),
-            ],
+            always_run: vec!["e2e".to_string(), "integration".to_string()],
             test_patterns,
             exclude_dirs: vec![
                 "node_modules".to_string(),
@@ -173,7 +177,9 @@ impl TestSelector {
 
         // 4. If changes are in critical paths (config, CI), run all tests
         if self.has_critical_changes(&relevant_files) {
-            reasoning.push("Critical files changed (CI config, dependencies) — running all tests".to_string());
+            reasoning.push(
+                "Critical files changed (CI config, dependencies) — running all tests".to_string(),
+            );
             return Ok(TestSelection {
                 changed_files: changed_files.to_vec(),
                 selected_tests: vec!["all".to_string()],
@@ -225,7 +231,10 @@ impl TestSelector {
             .context("Failed to run git diff")?;
 
         if !output.status.success() {
-            anyhow::bail!("git diff failed: {}", String::from_utf8_lossy(&output.stderr));
+            anyhow::bail!(
+                "git diff failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
 
         let files = String::from_utf8(output.stdout)?
@@ -252,16 +261,22 @@ impl TestSelector {
         let path_str = path.to_string_lossy();
 
         // Check common test patterns
-        path_str.contains("test") ||
-        path_str.contains("spec") ||
-        path_str.contains("__tests__") ||
-        path.file_name()
-            .and_then(|n| n.to_str())
-            .map(|n| n.starts_with("test_") || n.ends_with("_test.rs") ||
-                     n.ends_with("_test.go") || n.ends_with(".test.js") ||
-                     n.ends_with(".test.ts") || n.ends_with(".spec.js") ||
-                     n.ends_with(".spec.ts"))
-            .unwrap_or(false)
+        path_str.contains("test")
+            || path_str.contains("spec")
+            || path_str.contains("__tests__")
+            || path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|n| {
+                    n.starts_with("test_")
+                        || n.ends_with("_test.rs")
+                        || n.ends_with("_test.go")
+                        || n.ends_with(".test.js")
+                        || n.ends_with(".test.ts")
+                        || n.ends_with(".spec.js")
+                        || n.ends_with(".spec.ts")
+                })
+                .unwrap_or(false)
     }
 
     /// Detect languages from file extensions.
@@ -320,7 +335,9 @@ impl TestSelector {
                     return Some(test_file);
                 }
 
-                let test_dir = parent.join("__tests__").join(format!("{}.test.{}", source_stem, ext));
+                let test_dir = parent
+                    .join("__tests__")
+                    .join(format!("{}.test.{}", source_stem, ext));
                 if test_dir.exists() {
                     return Some(test_dir);
                 }
@@ -345,16 +362,16 @@ impl TestSelector {
     fn has_critical_changes(&self, files: &[&PathBuf]) -> bool {
         files.iter().any(|f| {
             let path_str = f.to_string_lossy();
-            path_str.contains(".github/workflows") ||
-            path_str.contains(".gitlab-ci") ||
-            path_str.contains("Jenkinsfile") ||
-            path_str.contains(".circleci") ||
-            path_str.contains("package.json") ||
-            path_str.contains("Cargo.toml") ||
-            path_str.contains("go.mod") ||
-            path_str.contains("requirements.txt") ||
-            path_str.contains("pom.xml") ||
-            path_str.contains("build.gradle")
+            path_str.contains(".github/workflows")
+                || path_str.contains(".gitlab-ci")
+                || path_str.contains("Jenkinsfile")
+                || path_str.contains(".circleci")
+                || path_str.contains("package.json")
+                || path_str.contains("Cargo.toml")
+                || path_str.contains("go.mod")
+                || path_str.contains("requirements.txt")
+                || path_str.contains("pom.xml")
+                || path_str.contains("build.gradle")
         })
     }
 

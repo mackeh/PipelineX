@@ -101,17 +101,16 @@ impl GitHubClient {
     /// Create a new GitHub API client
     pub fn new(token: Option<String>) -> Result<Self> {
         let mut headers = HeaderMap::new();
-        headers.insert(ACCEPT, HeaderValue::from_static("application/vnd.github+json"));
         headers.insert(
-            USER_AGENT,
-            HeaderValue::from_static("PipelineX/0.1.0"),
+            ACCEPT,
+            HeaderValue::from_static("application/vnd.github+json"),
         );
+        headers.insert(USER_AGENT, HeaderValue::from_static("PipelineX/0.1.0"));
 
         if let Some(ref t) = token {
             headers.insert(
                 AUTHORIZATION,
-                HeaderValue::from_str(&format!("Bearer {}", t))
-                    .context("Invalid GitHub token")?,
+                HeaderValue::from_str(&format!("Bearer {}", t)).context("Invalid GitHub token")?,
             );
         }
 
@@ -229,10 +228,7 @@ impl GitHubClient {
             match self.fetch_jobs(owner, repo, run.id).await {
                 Ok(jobs) => {
                     for job in jobs {
-                        job_data
-                            .entry(job.name.clone())
-                            .or_default()
-                            .push(job);
+                        job_data.entry(job.name.clone()).or_default().push(job);
                     }
                 }
                 Err(e) => {
@@ -261,10 +257,8 @@ impl GitHubClient {
         }
 
         // Calculate overall pipeline statistics
-        let completed_runs: Vec<&WorkflowRun> = runs
-            .iter()
-            .filter(|r| r.conclusion.is_some())
-            .collect();
+        let completed_runs: Vec<&WorkflowRun> =
+            runs.iter().filter(|r| r.conclusion.is_some()).collect();
 
         let success_count = completed_runs
             .iter()

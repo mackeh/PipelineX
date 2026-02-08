@@ -4,14 +4,17 @@ use crate::parser::dag::PipelineDag;
 /// Generate a self-contained HTML report with interactive visualizations.
 #[allow(clippy::format_in_format_args)]
 pub fn generate_html_report(report: &AnalysisReport, dag: &PipelineDag) -> String {
-    let critical_path_json = serde_json::to_string(&report.critical_path).unwrap_or_else(|_| "[]".to_string());
-    let findings_json = serde_json::to_string(&report.findings).unwrap_or_else(|_| "[]".to_string());
+    let critical_path_json =
+        serde_json::to_string(&report.critical_path).unwrap_or_else(|_| "[]".to_string());
+    let findings_json =
+        serde_json::to_string(&report.findings).unwrap_or_else(|_| "[]".to_string());
 
     // Generate DAG data for visualization
     let dag_nodes = generate_dag_nodes_json(dag);
     let dag_edges = generate_dag_edges_json(dag);
 
-    format!(r#"<!DOCTYPE html>
+    format!(
+        r#"<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -447,7 +450,9 @@ pub fn generate_html_report(report: &AnalysisReport, dag: &PipelineDag) -> Strin
 
 fn generate_dag_nodes_json(dag: &PipelineDag) -> String {
     // Simple level calculation - just use index as a rough approximation
-    let nodes: Vec<serde_json::Value> = dag.graph.node_indices()
+    let nodes: Vec<serde_json::Value> = dag
+        .graph
+        .node_indices()
         .enumerate()
         .map(|(level, idx)| {
             let node = &dag.graph[idx];
@@ -464,7 +469,9 @@ fn generate_dag_nodes_json(dag: &PipelineDag) -> String {
 }
 
 fn generate_dag_edges_json(dag: &PipelineDag) -> String {
-    let edges: Vec<serde_json::Value> = dag.graph.edge_indices()
+    let edges: Vec<serde_json::Value> = dag
+        .graph
+        .edge_indices()
         .filter_map(|idx| {
             let (from, to) = dag.graph.edge_endpoints(idx)?;
             let from_node = &dag.graph[from];

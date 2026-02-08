@@ -17,10 +17,10 @@ impl GitHubActionsParser {
 
     /// Parse GitHub Actions YAML content into a Pipeline DAG.
     pub fn parse(content: &str, source_file: String) -> Result<PipelineDag> {
-        let yaml: Value = serde_yaml::from_str(content)
-            .context("Failed to parse YAML")?;
+        let yaml: Value = serde_yaml::from_str(content).context("Failed to parse YAML")?;
 
-        let name = yaml.get("name")
+        let name = yaml
+            .get("name")
             .and_then(|v| v.as_str())
             .unwrap_or("Unnamed Workflow")
             .to_string();
@@ -36,7 +36,8 @@ impl GitHubActionsParser {
         }
 
         // Parse jobs
-        let jobs = yaml.get("jobs")
+        let jobs = yaml
+            .get("jobs")
             .and_then(|v| v.as_mapping())
             .context("No 'jobs' section found in workflow")?;
 
@@ -98,15 +99,31 @@ impl GitHubActionsParser {
                         Some(e) => e.to_string(),
                         None => continue,
                     };
-                    let branches = config.get("branches")
+                    let branches =
+                        config
+                            .get("branches")
+                            .and_then(|v| v.as_sequence())
+                            .map(|seq| {
+                                seq.iter()
+                                    .filter_map(|v| v.as_str().map(String::from))
+                                    .collect()
+                            });
+                    let paths = config
+                        .get("paths")
                         .and_then(|v| v.as_sequence())
-                        .map(|seq| seq.iter().filter_map(|v| v.as_str().map(String::from)).collect());
-                    let paths = config.get("paths")
+                        .map(|seq| {
+                            seq.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect()
+                        });
+                    let paths_ignore = config
+                        .get("paths-ignore")
                         .and_then(|v| v.as_sequence())
-                        .map(|seq| seq.iter().filter_map(|v| v.as_str().map(String::from)).collect());
-                    let paths_ignore = config.get("paths-ignore")
-                        .and_then(|v| v.as_sequence())
-                        .map(|seq| seq.iter().filter_map(|v| v.as_str().map(String::from)).collect());
+                        .map(|seq| {
+                            seq.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect()
+                        });
 
                     triggers.push(WorkflowTrigger {
                         event: event_name,
@@ -123,7 +140,8 @@ impl GitHubActionsParser {
     }
 
     fn parse_job(job_id: &str, config: &Value) -> Result<JobNode> {
-        let name = config.get("name")
+        let name = config
+            .get("name")
             .and_then(|v| v.as_str())
             .unwrap_or(job_id)
             .to_string();
@@ -175,28 +193,24 @@ impl GitHubActionsParser {
     fn parse_needs(needs: &Value) -> Vec<String> {
         match needs {
             Value::String(s) => vec![s.clone()],
-            Value::Sequence(seq) => {
-                seq.iter()
-                    .filter_map(|v| v.as_str().map(String::from))
-                    .collect()
-            }
+            Value::Sequence(seq) => seq
+                .iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect(),
             _ => Vec::new(),
         }
     }
 
     fn parse_step(step: &Value) -> StepInfo {
-        let name = step.get("name")
+        let name = step
+            .get("name")
             .and_then(|v| v.as_str())
             .unwrap_or("Unnamed step")
             .to_string();
 
-        let uses = step.get("uses")
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let uses = step.get("uses").and_then(|v| v.as_str()).map(String::from);
 
-        let run = step.get("run")
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let run = step.get("run").and_then(|v| v.as_str()).map(String::from);
 
         let estimated_duration = Self::estimate_step_duration(&uses, &run);
 
@@ -234,7 +248,8 @@ impl GitHubActionsParser {
                 continue;
             }
             if let Some(seq) = value.as_sequence() {
-                let values: Vec<String> = seq.iter()
+                let values: Vec<String> = seq
+                    .iter()
                     .filter_map(|v| match v {
                         Value::String(s) => Some(s.clone()),
                         Value::Number(n) => Some(n.to_string()),
@@ -288,7 +303,9 @@ impl GitHubActionsParser {
             if uses.starts_with("docker/build-push-action") {
                 return 300.0;
             }
-            if uses.starts_with("actions/upload-artifact") || uses.starts_with("actions/download-artifact") {
+            if uses.starts_with("actions/upload-artifact")
+                || uses.starts_with("actions/download-artifact")
+            {
                 return 15.0;
             }
             return 20.0; // Generic action
@@ -296,7 +313,11 @@ impl GitHubActionsParser {
 
         if let Some(run) = run {
             let cmd = run.to_lowercase();
-            if cmd.contains("npm install") || cmd.contains("npm ci") || cmd.contains("yarn install") || cmd.contains("pnpm install") {
+            if cmd.contains("npm install")
+                || cmd.contains("npm ci")
+                || cmd.contains("yarn install")
+                || cmd.contains("pnpm install")
+            {
                 return 180.0;
             }
             if cmd.contains("pip install") {
@@ -305,10 +326,17 @@ impl GitHubActionsParser {
             if cmd.contains("cargo build") {
                 return 300.0;
             }
-            if cmd.contains("npm run build") || cmd.contains("yarn build") || cmd.contains("pnpm build") {
+            if cmd.contains("npm run build")
+                || cmd.contains("yarn build")
+                || cmd.contains("pnpm build")
+            {
                 return 240.0;
             }
-            if cmd.contains("npm test") || cmd.contains("pytest") || cmd.contains("cargo test") || cmd.contains("jest") {
+            if cmd.contains("npm test")
+                || cmd.contains("pytest")
+                || cmd.contains("cargo test")
+                || cmd.contains("jest")
+            {
                 return 300.0;
             }
             if cmd.contains("npm run lint") || cmd.contains("eslint") || cmd.contains("clippy") {
@@ -330,7 +358,8 @@ impl GitHubActionsParser {
     }
 
     fn estimate_job_duration(job: &JobNode) -> f64 {
-        job.steps.iter()
+        job.steps
+            .iter()
             .filter_map(|s| s.estimated_duration_secs)
             .sum()
     }

@@ -1,5 +1,5 @@
-use crate::parser::dag::PipelineDag;
 use crate::analyzer::report::format_duration;
+use crate::parser::dag::PipelineDag;
 use petgraph::Direction;
 
 /// Generate a Mermaid flowchart diagram from a Pipeline DAG.
@@ -35,7 +35,10 @@ pub fn to_mermaid(dag: &PipelineDag) -> String {
         ));
     }
     if !leaves.is_empty() {
-        let leaf_ids: Vec<String> = leaves.iter().map(|&idx| dag.graph[idx].id.clone()).collect();
+        let leaf_ids: Vec<String> = leaves
+            .iter()
+            .map(|&idx| dag.graph[idx].id.clone())
+            .collect();
         lines.push(format!(
             "    style {} fill:#3b82f6,color:#fff",
             leaf_ids.join(",")
@@ -50,7 +53,9 @@ pub fn to_dot(dag: &PipelineDag) -> String {
     let mut lines = Vec::new();
     lines.push(format!("digraph \"{}\" {{", dag.name));
     lines.push("    rankdir=LR;".to_string());
-    lines.push("    node [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\"];".to_string());
+    lines.push(
+        "    node [shape=box, style=\"rounded,filled\", fontname=\"Helvetica\"];".to_string(),
+    );
     lines.push("    edge [color=\"#666666\"];".to_string());
     lines.push(String::new());
 
@@ -100,10 +105,15 @@ pub fn to_ascii(dag: &PipelineDag) -> String {
     };
 
     // Compute levels
-    let mut levels: std::collections::HashMap<petgraph::graph::NodeIndex, usize> = std::collections::HashMap::new();
+    let mut levels: std::collections::HashMap<petgraph::graph::NodeIndex, usize> =
+        std::collections::HashMap::new();
     for &node in &topo {
-        let deps: Vec<_> = dag.graph.neighbors_directed(node, Direction::Incoming).collect();
-        let level = deps.iter()
+        let deps: Vec<_> = dag
+            .graph
+            .neighbors_directed(node, Direction::Incoming)
+            .collect();
+        let level = deps
+            .iter()
             .map(|d| levels.get(d).copied().unwrap_or(0) + 1)
             .max()
             .unwrap_or(0);
@@ -127,12 +137,19 @@ pub fn to_ascii(dag: &PipelineDag) -> String {
     lines.push(String::new());
 
     for (level, jobs) in level_jobs.iter().enumerate() {
-        let prefix = if level == 0 { "START" } else { &format!("L{}", level) };
-        let job_strs: Vec<String> = jobs.iter().map(|&idx| {
-            let job = &dag.graph[idx];
-            let duration = format_duration(job.estimated_duration_secs);
-            format!("[{} ({})]", job.id, duration)
-        }).collect();
+        let prefix = if level == 0 {
+            "START"
+        } else {
+            &format!("L{}", level)
+        };
+        let job_strs: Vec<String> = jobs
+            .iter()
+            .map(|&idx| {
+                let job = &dag.graph[idx];
+                let duration = format_duration(job.estimated_duration_secs);
+                format!("[{} ({})]", job.id, duration)
+            })
+            .collect();
 
         if jobs.len() > 1 {
             lines.push(format!("  {:>5} ─┬─ {}", prefix, job_strs[0]));
@@ -155,7 +172,9 @@ pub fn to_ascii(dag: &PipelineDag) -> String {
     lines.push(String::new());
 
     // Critical path summary
-    let total: f64 = dag.graph.node_weights()
+    let total: f64 = dag
+        .graph
+        .node_weights()
         .map(|j| j.estimated_duration_secs)
         .sum();
     lines.push(format!("Total job time: {}", format_duration(total)));

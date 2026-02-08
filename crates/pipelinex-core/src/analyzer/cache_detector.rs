@@ -1,5 +1,5 @@
-use crate::parser::dag::PipelineDag;
 use crate::analyzer::report::{Finding, FindingCategory, Severity};
+use crate::parser::dag::PipelineDag;
 use regex::Regex;
 
 /// Detect missing dependency caches in the pipeline.
@@ -8,7 +8,9 @@ pub fn detect_missing_caches(dag: &PipelineDag) -> Vec<Finding> {
 
     for job in dag.graph.node_weights() {
         let has_cache_action = job.steps.iter().any(|s| {
-            s.uses.as_ref().is_some_and(|u| u.starts_with("actions/cache"))
+            s.uses
+                .as_ref()
+                .is_some_and(|u| u.starts_with("actions/cache"))
         });
 
         for step in &job.steps {
@@ -28,9 +30,10 @@ pub fn detect_missing_caches(dag: &PipelineDag) -> Vec<Finding> {
                             run.lines().next().unwrap_or(run).trim(),
                         ),
                         affected_jobs: vec![job.id.clone()],
-                        recommendation: "Add actions/cache for node_modules keyed on package-lock.json hash, \
+                        recommendation:
+                            "Add actions/cache for node_modules keyed on package-lock.json hash, \
                             or use setup-node with built-in caching."
-                            .to_string(),
+                                .to_string(),
                         fix_command: Some("pipelinex optimize --apply cache".to_string()),
                         estimated_savings_secs: Some(150.0), // ~2.5 min
                         confidence: 0.95,
@@ -104,7 +107,9 @@ pub fn detect_missing_caches(dag: &PipelineDag) -> Vec<Finding> {
                 // Docker build without layer caching
                 if is_docker_build(&cmd) {
                     let has_docker_cache = job.steps.iter().any(|s| {
-                        s.uses.as_ref().is_some_and(|u| u.starts_with("docker/build-push-action"))
+                        s.uses
+                            .as_ref()
+                            .is_some_and(|u| u.starts_with("docker/build-push-action"))
                     });
                     if !has_docker_cache && !cmd.contains("--cache-from") {
                         findings.push(Finding {
@@ -117,9 +122,10 @@ pub fn detect_missing_caches(dag: &PipelineDag) -> Vec<Finding> {
                                 job.id,
                             ),
                             affected_jobs: vec![job.id.clone()],
-                            recommendation: "Use docker/build-push-action with cache-from/cache-to, \
+                            recommendation:
+                                "Use docker/build-push-action with cache-from/cache-to, \
                                 or add --cache-from flag."
-                                .to_string(),
+                                    .to_string(),
                             fix_command: Some("pipelinex optimize --apply docker".to_string()),
                             estimated_savings_secs: Some(240.0),
                             confidence: 0.88,
@@ -148,7 +154,10 @@ fn is_cargo_build(cmd: &str) -> bool {
 }
 
 fn is_gradle_or_maven(cmd: &str) -> bool {
-    cmd.contains("./gradlew") || cmd.contains("gradle ") || cmd.contains("mvn ") || cmd.contains("./mvnw")
+    cmd.contains("./gradlew")
+        || cmd.contains("gradle ")
+        || cmd.contains("mvn ")
+        || cmd.contains("./mvnw")
 }
 
 fn is_docker_build(cmd: &str) -> bool {
@@ -197,7 +206,8 @@ jobs:
 "#;
         let dag = GitHubActionsParser::parse(yaml, "ci.yml".to_string()).unwrap();
         let findings = detect_missing_caches(&dag);
-        let npm_findings: Vec<_> = findings.iter()
+        let npm_findings: Vec<_> = findings
+            .iter()
             .filter(|f| f.title.contains("npm"))
             .collect();
         assert!(npm_findings.is_empty());
