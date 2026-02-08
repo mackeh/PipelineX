@@ -29,7 +29,7 @@ enum Commands {
         #[arg(default_value = ".github/workflows/")]
         path: PathBuf,
 
-        /// Output format (text, json, sarif)
+        /// Output format (text, json, sarif, html)
         #[arg(short, long, default_value = "text")]
         format: String,
     },
@@ -213,6 +213,10 @@ fn cmd_analyze(path: &PathBuf, format: &str) -> Result<()> {
                 let sarif = pipelinex_core::analyzer::sarif::to_sarif(&report);
                 let json = serde_json::to_string_pretty(&sarif)?;
                 println!("{}", json);
+            }
+            "html" => {
+                let html = pipelinex_core::analyzer::html_report::generate_html_report(&report, &dag);
+                println!("{}", html);
             }
             _ => {
                 display::print_analysis_report(&report);

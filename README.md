@@ -37,6 +37,9 @@ pipelinex simulate .github/workflows/ci.yml --runs 1000
 # Analyze a Dockerfile
 pipelinex docker Dockerfile
 pipelinex docker Dockerfile --optimize
+
+# Generate interactive HTML report
+pipelinex analyze .github/workflows/ci.yml --format html > report.html
 ```
 
 ## What It Detects
@@ -161,7 +164,7 @@ graph LR
 
 ```
 pipelinex analyze [OPTIONS] <PATH>
-  -f, --format <FORMAT>   Output format: text, json, sarif [default: text]
+  -f, --format <FORMAT>   Output format: text, json, sarif, html [default: text]
 
 pipelinex optimize [OPTIONS] <PATH>
   -o, --output <FILE>     Write optimized config to file
@@ -246,6 +249,7 @@ PipelineX/
 │   │   │   │   ├── parallel_finder.rs# False dependency & parallelization
 │   │   │   │   ├── waste_detector.rs # Waste detection (path filters, etc.)
 │   │   │   │   ├── sarif.rs         # SARIF 2.1.0 output for code scanning
+│   │   │   │   ├── html_report.rs   # Interactive HTML reports
 │   │   │   │   └── report.rs        # Report data structures
 │   │   │   ├── optimizer/           # Config generation
 │   │   │   │   ├── cache_gen.rs     # Cache step injection
@@ -296,6 +300,7 @@ PipelineX/
 - [x] Dockerfile analysis and optimization (multi-stage builds, cache busting, base images)
 - [x] Matrix/shard optimizer (combinatorial explosion reduction, smart test sharding)
 - [x] SARIF 2.1.0 output for GitHub Code Scanning / IDE integration
+- [x] Interactive HTML reports with DAG visualization and dark mode
 - [x] GitHub Actions CI pipeline for PipelineX itself
 - [x] 47 tests (27 unit + 20 integration) across all modules
 - [x] 18 test fixtures (GitHub Actions, GitLab CI, Jenkins, Dockerfiles)
