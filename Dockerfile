@@ -1,5 +1,5 @@
 # Multi-stage build for minimal final image
-FROM rust:1.75-slim as builder
+FROM rust:1.93-slim AS builder
 
 WORKDIR /build
 
