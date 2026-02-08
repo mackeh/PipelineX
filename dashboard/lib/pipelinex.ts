@@ -125,6 +125,16 @@ function pathExists(filePath: string): Promise<boolean> {
 }
 
 export async function getRepoRoot(): Promise<string> {
+  const configuredRoot = process.env.PIPELINEX_REPO_ROOT?.trim();
+  if (configuredRoot) {
+    const resolved = path.resolve(configuredRoot);
+    const exists = await pathExists(resolved);
+    if (exists) {
+      return resolved;
+    }
+    throw new Error(`PIPELINEX_REPO_ROOT does not exist: ${resolved}`);
+  }
+
   const cwd = process.cwd();
   const cwdHasCargo = await pathExists(path.join(cwd, "Cargo.toml"));
   if (cwdHasCargo) {
