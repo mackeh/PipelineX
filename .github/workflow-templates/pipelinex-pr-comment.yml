@@ -1,0 +1,46 @@
+name: PipelineX PR Analysis
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PipelineX
+        run: |
+          cargo install --git https://github.com/mackeh/PipelineX pipelinex-cli
+
+      - name: Analyze Pipeline Changes
+        id: analyze
+        run: |
+          # Generate analysis
+          pipelinex analyze .github/workflows/ci.yml > analysis.txt
+
+          # Create PR comment body
+          cat > comment.md << 'COMMENT'
+          ## 🔍 PipelineX Analysis
+
+          \`\`\`
+          $(cat analysis.txt)
+          \`\`\`
+
+          ---
+          💡 **Tip:** Run \`pipelinex diff .github/workflows/ci.yml\` locally to see optimizations
+          COMMENT
+
+          echo "comment_file=comment.md" >> $GITHUB_OUTPUT
+
+      - name: Post PR Comment
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: comment.md

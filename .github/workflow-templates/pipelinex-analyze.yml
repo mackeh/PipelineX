@@ -1,0 +1,45 @@
+name: PipelineX CI Analysis
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PipelineX
+        run: |
+          cargo install --git https://github.com/mackeh/PipelineX pipelinex-cli
+
+      - name: Analyze Pipeline
+        run: |
+          pipelinex analyze .github/workflows/ci.yml --format sarif > pipelinex-results.sarif
+
+      - name: Upload SARIF to GitHub
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: pipelinex-results.sarif
+          category: pipelinex
+
+      - name: Generate HTML Report
+        run: |
+          pipelinex analyze .github/workflows/ci.yml --format html > pipelinex-report.html
+
+      - name: Upload HTML Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipelinex-report
+          path: pipelinex-report.html
+
+      - name: Check for Critical Issues
+        run: |
+          pipelinex analyze .github/workflows/ci.yml --format json | \
+            jq -e '.findings | map(select(.severity == "Critical")) | length == 0' || \
+            (echo "⚠️ Critical pipeline issues detected!" && exit 1)

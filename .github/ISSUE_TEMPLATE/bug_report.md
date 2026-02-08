@@ -1,38 +1,41 @@
 ---
-name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
+name: Bug Report
+about: Report a bug or unexpected behavior
+title: '[BUG] '
+labels: bug
 assignees: ''
-
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+## Description
+<!-- A clear description of the bug -->
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+## Steps to Reproduce
+1. Run command: `pipelinex ...`
+2. With this config file: <!-- attach or link -->
+3. See error
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+## Expected Behavior
+<!-- What should happen? -->
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+## Actual Behavior
+<!-- What actually happens? Include error messages -->
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+```
+Paste error output here
+```
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+## Environment
+- **OS:** <!-- e.g., macOS 14.0, Ubuntu 22.04, Windows 11 -->
+- **PipelineX version:** <!-- Run `pipelinex --version` -->
+- **Rust version:** <!-- Run `rustc --version` if building from source -->
+- **CI Platform:** <!-- e.g., GitHub Actions, GitLab CI, Jenkins -->
 
-**Additional context**
-Add any other context about the problem here.
+## Sample Pipeline Config
+<!-- If relevant, attach your pipeline YAML file or provide a minimal example -->
+
+```yaml
+# Your pipeline config here
+```
+
+## Additional Context
+<!-- Any other information that might help -->
