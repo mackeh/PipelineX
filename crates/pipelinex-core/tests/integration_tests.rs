@@ -2,6 +2,7 @@ use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
 use pipelinex_core::parser::jenkins::JenkinsParser;
 use pipelinex_core::parser::circleci::CircleCIParser;
+use pipelinex_core::parser::bitbucket::BitbucketParser;
 use pipelinex_core::analyzer;
 use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::optimizer::docker_opt;
@@ -34,6 +35,10 @@ fn jenkins_fixture(name: &str) -> PathBuf {
 
 fn circleci_fixture(name: &str) -> PathBuf {
     fixtures_dir().join("circleci").join(name)
+}
+
+fn bitbucket_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("bitbucket").join(name)
 }
 
 // ─── GitHub Actions integration tests ───
@@ -339,4 +344,51 @@ fn test_circleci_detects_bottlenecks() {
         }),
         "Should detect bottlenecks or missing caches"
     );
+}
+
+// ─── Bitbucket Pipelines integration tests ───
+
+#[test]
+fn test_analyze_bitbucket_pipelines() {
+    let path = bitbucket_fixture("bitbucket-pipelines.yml");
+    let dag = BitbucketParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.provider, "bitbucket");
+    assert!(report.job_count >= 5, "Should have multiple jobs from different pipeline types");
+    assert!(report.max_parallelism >= 3, "Should detect parallel execution");
+}
+
+#[test]
+fn test_bitbucket_parallel_detection() {
+    let path = bitbucket_fixture("bitbucket-pipelines.yml");
+    let dag = BitbucketParser::parse_file(&path).unwrap();
+
+    // Verify parallel steps are correctly parsed
+    let lint = dag.get_job("main-lint");
+    let unit_tests = dag.get_job("main-unit-tests");
+    let integration_tests = dag.get_job("main-integration-tests");
+
+    assert!(lint.is_some());
+    assert!(unit_tests.is_some());
+    assert!(integration_tests.is_some());
+
+    // All three should have the same dependency (install)
+    let lint_needs = &lint.unwrap().needs;
+    let unit_needs = &unit_tests.unwrap().needs;
+    let integration_needs = &integration_tests.unwrap().needs;
+
+    assert_eq!(lint_needs, unit_needs);
+    assert_eq!(unit_needs, integration_needs);
+}
+
+#[test]
+fn test_bitbucket_finds_optimizations() {
+    let path = bitbucket_fixture("bitbucket-pipelines.yml");
+    let dag = BitbucketParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    // Should detect missing caches and parallel opportunities
+    assert!(!report.findings.is_empty());
+    assert!(report.potential_improvement_pct() > 50.0, "Should find significant optimizations");
 }

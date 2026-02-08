@@ -2,7 +2,7 @@
 
 **Your pipelines are slow. PipelineX knows why — and fixes them automatically.**
 
-PipelineX is an intelligent CI/CD analysis tool that reads your pipeline configurations, identifies exactly where time and money are wasted, and generates optimized configurations. It works offline, requires no account, and supports **GitHub Actions**, **GitLab CI**, **Jenkins**, and **CircleCI** with more platforms planned.
+PipelineX is an intelligent CI/CD analysis tool that reads your pipeline configurations, identifies exactly where time and money are wasted, and generates optimized configurations. It works offline, requires no account, and supports **GitHub Actions**, **GitLab CI**, **Jenkins**, **CircleCI**, and **Bitbucket Pipelines** with more platforms planned.
 
 [![CI](https://github.com/mackeh/PipelineX/actions/workflows/ci.yml/badge.svg)](https://github.com/mackeh/PipelineX/actions/workflows/ci.yml)
 
@@ -267,7 +267,8 @@ PipelineX/
 │   │   │   │   ├── github.rs        # GitHub Actions parser
 │   │   │   │   ├── gitlab.rs        # GitLab CI parser
 │   │   │   │   ├── jenkins.rs       # Jenkins (Jenkinsfile) parser
-│   │   │   │   └── circleci.rs      # CircleCI parser
+│   │   │   │   ├── circleci.rs      # CircleCI parser
+│   │   │   │   └── bitbucket.rs     # Bitbucket Pipelines parser
 │   │   │   ├── analyzer/            # Bottleneck detection
 │   │   │   │   ├── critical_path.rs # Critical path analysis (longest path)
 │   │   │   │   ├── cache_detector.rs# Missing dependency cache detection
@@ -298,6 +299,8 @@ PipelineX/
 │       ├── gitlab-ci/               # 3 GitLab CI pipeline samples
 │       ├── jenkins/                 # 3 Jenkins pipeline samples
 │       ├── circleci/                # 1 CircleCI config sample
+│       ├── bitbucket/               # 1 Bitbucket Pipelines sample
+│       ├── junit/                   # 12 JUnit XML test results
 │       └── dockerfiles/             # 4 Dockerfile samples
 ├── .github/
 │   └── workflows/
@@ -324,6 +327,7 @@ PipelineX/
 - [x] GitLab CI parser (stages, needs, parallel keyword, rules, hidden jobs)
 - [x] Jenkins parser (declarative pipelines, stages, parallel, Docker agents)
 - [x] CircleCI parser (jobs, workflows, executors, orbs)
+- [x] Bitbucket Pipelines parser (pipelines, parallel steps, deployments, caches)
 - [x] Monte Carlo simulation engine (xorshift64 RNG, per-job stats, histograms)
 - [x] Pipeline DAG visualization (Mermaid, Graphviz DOT, ASCII)
 - [x] Dockerfile analysis and optimization (multi-stage builds, cache busting, base images)
@@ -331,8 +335,8 @@ PipelineX/
 - [x] SARIF 2.1.0 output for GitHub Code Scanning / IDE integration
 - [x] Interactive HTML reports with DAG visualization and dark mode
 - [x] GitHub Actions CI pipeline for PipelineX itself
-- [x] 57 tests (34 unit + 23 integration) across all modules
-- [x] 19 test fixtures (GitHub Actions, GitLab CI, Jenkins, CircleCI, Dockerfiles)
+- [x] 67 tests (41 unit + 26 integration) across all modules
+- [x] 32 test fixtures (GitHub Actions, GitLab CI, Jenkins, CircleCI, Bitbucket, JUnit XML, Dockerfiles)
 
 ### Phase 3 (In Progress)
 - [ ] GitHub API integration for historical run data
@@ -343,7 +347,6 @@ PipelineX/
 - [ ] Slack/Teams weekly digest reports
 
 ### Phase 4 (Planned)
-- [ ] Jenkins, Bitbucket Pipelines, CircleCI support
 - [ ] VS Code extension
 - [ ] Community benchmark registry
 - [ ] Azure Pipelines, AWS CodePipeline, Buildkite support
@@ -358,7 +361,7 @@ PipelineX/
 | GitLab CI | Supported |
 | Jenkins | Supported |
 | CircleCI | Supported |
-| Bitbucket Pipelines | Planned |
+| Bitbucket Pipelines | Supported |
 | Azure Pipelines | Planned |
 | AWS CodePipeline | Planned |
 | Buildkite | Planned |

@@ -12,6 +12,7 @@ pub use parser::github::GitHubActionsParser;
 pub use parser::gitlab::GitLabCIParser;
 pub use parser::jenkins::JenkinsParser;
 pub use parser::circleci::CircleCIParser;
+pub use parser::bitbucket::BitbucketParser;
 pub use analyzer::report::{AnalysisReport, Finding, Severity};
 pub use optimizer::Optimizer;
 pub use test_selector::{TestSelector, TestSelection, TestSelectorConfig};

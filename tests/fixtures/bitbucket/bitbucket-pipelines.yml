@@ -1,0 +1,67 @@
+image: node:18
+
+pipelines:
+  default:
+    - step:
+        name: Build and Test
+        caches:
+          - node
+        script:
+          - npm ci
+          - npm run build
+          - npm test
+        artifacts:
+          - dist/**
+
+  branches:
+    main:
+      - step:
+          name: Install Dependencies
+          caches:
+            - node
+          script:
+            - npm ci
+          artifacts:
+            - node_modules/**
+
+      - parallel:
+          - step:
+              name: Lint
+              script:
+                - npm run lint
+          - step:
+              name: Unit Tests
+              script:
+                - npm test
+          - step:
+              name: Integration Tests
+              script:
+                - npm run test:integration
+
+      - step:
+          name: Build
+          script:
+            - npm run build
+          artifacts:
+            - dist/**
+
+      - step:
+          name: Deploy to Production
+          deployment: production
+          script:
+            - npm run deploy
+
+  pull-requests:
+    '**':
+      - step:
+          name: PR Check
+          caches:
+            - node
+          script:
+            - npm ci
+            - npm run lint
+            - npm test
+
+definitions:
+  caches:
+    node: node_modules
