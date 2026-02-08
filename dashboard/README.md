@@ -77,6 +77,7 @@ Query params:
 ### Public API (keyed)
 
 - `GET /api/public/v1/auth/me`
+- `GET /api/public/v1/audit/logs`
 - `GET /api/public/v1/benchmarks/stats`
 - `POST /api/public/v1/benchmarks/submit`
 
@@ -85,17 +86,56 @@ Auth header options:
 - `Authorization: Bearer <token>`
 - `x-api-key: <token>`
 
+Role-aware key config is supported via:
+
+- `PIPELINEX_API_KEY_ROLES` (CSV in single-key mode)
+- `roles` array on entries in `PIPELINEX_API_KEYS` / `PIPELINEX_API_KEYS_FILE`
+
+Built-in roles:
+
+- `admin`: `benchmarks:read`, `benchmarks:write`, `audit:read`
+- `analyst`: `benchmarks:read`, `audit:read`
+- `ingest`: `benchmarks:write`
+- `viewer`: `benchmarks:read`
+- `auditor`: `audit:read`
+
+`GET /api/public/v1/audit/logs` query params:
+
+- `keyId`
+- `scope`
+- `method`
+- `pathContains`
+- `status`
+- `since` (ISO timestamp)
+- `until` (ISO timestamp)
+- `limit` (max 1000)
+
+### Enterprise auth
+
+- `POST /api/enterprise/v1/sso/exchange`
+- `GET /api/enterprise/v1/auth/me`
+
+`POST /api/enterprise/v1/sso/exchange` accepts an HMAC-signed assertion and returns a short-lived enterprise session token. Enterprise tokens can be sent as:
+
+- `Authorization: Bearer pxe.<payload>.<signature>`
+- `x-enterprise-token: pxe.<payload>.<signature>`
+
 ## Environment variables
 
 - `GITHUB_TOKEN`: used for history refresh calls.
 - `GITHUB_WEBHOOK_SECRET`: enables webhook signature validation.
 - `PIPELINEX_HISTORY_RUNS`: optional lookback window for webhook-triggered refreshes (default `100`).
 - `PIPELINEX_API_KEY`: single-key public API mode.
+- `PIPELINEX_API_KEY_ROLES`: CSV roles for the single-key public API mode.
 - `PIPELINEX_API_KEYS`: JSON array of key configs (supports rotation fields).
 - `PIPELINEX_API_KEYS_FILE`: JSON file path for key config (recommended in production).
 - `PIPELINEX_API_RATE_LIMIT_PER_MINUTE`: default per-key rate limit.
 - `PIPELINEX_PUBLIC_API_RATE_LIMIT_FILE`: override persistent rate-limit store file path.
 - `PIPELINEX_PUBLIC_API_AUDIT_LOG_FILE`: override JSONL audit log file path.
+- `PIPELINEX_ENTERPRISE_SESSION_SECRET`: required to sign/verify enterprise session tokens.
+- `PIPELINEX_ENTERPRISE_SESSION_TTL_SECONDS`: optional enterprise session TTL.
+- `PIPELINEX_SSO_SHARED_SECRET`: required to verify inbound SSO assertions.
+- `PIPELINEX_ENTERPRISE_RATE_LIMIT_PER_MINUTE`: optional enterprise-token rate limit.
 
 ## Local persistence
 
