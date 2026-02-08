@@ -5,6 +5,32 @@ All notable changes to PipelineX will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Planned Features
+- CI provider migration assistant ("convert GitHub Actions → GitLab CI")
+- Runner right-sizing recommendations (based on resource profiling)
+- Multi-repo pipeline analysis (monorepo orchestration detection)
+
+## [1.1.0] - 2026-02-08
+
+### Added
+- **New CI provider parsers** for Azure Pipelines, AWS CodePipeline, and Buildkite with fixture and integration-test coverage.
+- **Dashboard platform features** including workflow discovery APIs, live pipeline analysis views, GitHub webhook-triggered history refresh, and community benchmark cohort comparisons.
+- **Public REST API for custom integrations** with versioned endpoints:
+  - `/api/public/v1/workflows`
+  - `/api/public/v1/analyze`
+  - `/api/public/v1/history`
+  - `/api/public/v1/openapi`
+- **Enterprise auth and governance capabilities**: role-based scopes, key rotation fields, persistent rate limits, audit log querying, and enterprise SSO session exchange.
+- **Self-hosted deployment support** via `docker-compose.selfhost.yml` and Helm chart `deploy/helm/pipelinex-dashboard`.
+- **Plugin system scaffold** with CLI support for listing and scaffolding external analyzer/optimizer plugins.
+- **VS Code extension** in `vscode-extension/` with inline diagnostics and code-lens optimization hints for workflow files.
+
+### Changed
+- Hardened dashboard/public API auth flow and persistence with on-disk audit and rate-limit stores.
+- Updated project documentation to include self-hosting, REST API, plugin, and VS Code extension guides.
+
 ## [1.0.0] - 2026-02-08
 
 ### 🎉 Initial Release - Production Ready!
@@ -110,13 +136,5 @@ See [GitHub Issues](https://github.com/mackeh/PipelineX/issues) for planned feat
 
 ---
 
-## [Unreleased]
-
-### Planned Features
-- Azure Pipelines parser
-- AWS CodePipeline support
-- Trend tracking and regression detection
-- Community benchmark registry
-- VS Code extension with inline hints
-
+[1.1.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.1.0
 [1.0.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.0.0
