@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { queryBenchmarkStats } from "@/lib/pipelinex";
 import {
-  applyRateLimitHeaders,
   authenticatePublicApiRequest,
+  finalizePublicApiResponse,
 } from "@/lib/public-api";
 
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ function parsePositiveInt(value: string | null, fieldName: string): number {
 }
 
 export async function GET(request: Request) {
-  const auth = authenticatePublicApiRequest(request, "benchmarks:read");
+  const auth = await authenticatePublicApiRequest(request, "benchmarks:read");
   if (!auth.ok) {
     return auth.response;
   }
@@ -30,11 +30,15 @@ export async function GET(request: Request) {
   const provider = searchParams.get("provider")?.trim() || "";
 
   if (!provider) {
-    const response = NextResponse.json(
+    return finalizePublicApiResponse(
+      request,
+      auth,
+      NextResponse.json(
       { error: "provider query parameter is required." },
       { status: 400 },
+      ),
+      "Missing provider query parameter.",
     );
-    return applyRateLimitHeaders(response, auth.rateLimit);
   }
 
   let jobCount = 0;
@@ -43,35 +47,51 @@ export async function GET(request: Request) {
     jobCount = parsePositiveInt(searchParams.get("jobCount"), "jobCount");
     stepCount = parsePositiveInt(searchParams.get("stepCount"), "stepCount");
   } catch (error) {
-    const response = NextResponse.json(
+    return finalizePublicApiResponse(
+      request,
+      auth,
+      NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Invalid benchmark query.",
       },
       { status: 400 },
+      ),
+      "Invalid benchmark stats query.",
     );
-    return applyRateLimitHeaders(response, auth.rateLimit);
   }
 
   try {
     const stats = await queryBenchmarkStats({ provider, jobCount, stepCount });
     if (!stats) {
-      const response = NextResponse.json(
+      return finalizePublicApiResponse(
+        request,
+        auth,
+        NextResponse.json(
         { error: "No benchmark data available for the requested cohort." },
         { status: 404 },
+        ),
+        "No benchmark stats for cohort.",
       );
-      return applyRateLimitHeaders(response, auth.rateLimit);
     }
 
-    const response = NextResponse.json({ stats });
-    return applyRateLimitHeaders(response, auth.rateLimit);
+    return finalizePublicApiResponse(
+      request,
+      auth,
+      NextResponse.json({ stats }),
+      "Benchmark stats returned.",
+    );
   } catch (error) {
-    const response = NextResponse.json(
+    return finalizePublicApiResponse(
+      request,
+      auth,
+      NextResponse.json(
       {
         error:
           error instanceof Error ? error.message : "Failed to query benchmark stats.",
       },
       { status: 500 },
+      ),
+      "Benchmark stats query failed.",
     );
-    return applyRateLimitHeaders(response, auth.rateLimit);
   }
 }
