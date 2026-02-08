@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  pipelinex:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mackeh/pipelinex:latest
+    container_name: pipelinex
+    volumes:
+      # Mount current directory as workspace (read-only for safety)
+      - .:/workspace:ro
+    working_dir: /workspace
+    # Override default command - examples below
+    command: ["analyze", ".github/workflows/ci.yml"]
+
+  # Example service: Generate HTML report
+  pipelinex-report:
+    image: mackeh/pipelinex:latest
+    volumes:
+      - .:/workspace:ro
+      - ./reports:/reports
+    working_dir: /workspace
+    command: ["analyze", ".github/workflows/ci.yml", "--format", "html"]
+    # Redirect output to file in host's reports/ directory
+
+  # Example service: Cost analysis
+  pipelinex-cost:
+    image: mackeh/pipelinex:latest
+    volumes:
+      - .:/workspace:ro
+    working_dir: /workspace
+    command: ["cost", ".github/workflows/"]
+
+  # Example service: Continuous monitoring
+  pipelinex-watch:
+    image: mackeh/pipelinex:latest
+    volumes:
+      - .:/workspace:ro
+    working_dir: /workspace
+    restart: unless-stopped
+    command: >
+      bash -c "
+        while true; do
+          echo '=== Pipeline Analysis at $(date) ==='
+          pipelinex analyze .github/workflows/ci.yml --format json
+          sleep 3600  # Run every hour
+        done
+      "
+
+# Example usage:
+# docker-compose run pipelinex analyze .github/workflows/ci.yml
+# docker-compose run pipelinex optimize .github/workflows/ci.yml -o optimized.yml
+# docker-compose run pipelinex diff .github/workflows/ci.yml
+# docker-compose run pipelinex cost .github/workflows/
+# docker-compose run pipelinex simulate .github/workflows/ci.yml
+# docker-compose up pipelinex-watch  # Start monitoring service

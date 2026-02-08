@@ -1,0 +1,61 @@
+{
+  // Rust settings
+  "rust-analyzer.checkOnSave.command": "clippy",
+  "rust-analyzer.checkOnSave.extraArgs": ["--all-targets", "--", "-D", "warnings"],
+  "rust-analyzer.cargo.allFeatures": true,
+
+  // Editor settings for Rust
+  "editor.formatOnSave": true,
+  "editor.rulers": [100],
+  "[rust]": {
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "editor.formatOnSave": true,
+    "editor.tabSize": 4
+  },
+
+  // YAML settings
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml",
+    "editor.insertSpaces": true,
+    "editor.tabSize": 2
+  },
+  "yaml.schemas": {
+    "https://json.schemastore.org/github-workflow.json": ".github/workflows/*.yml",
+    "https://gitlab.com/gitlab-org/gitlab/-/raw/master/app/assets/javascripts/editor/schema/ci.json": ".gitlab-ci.yml"
+  },
+
+  // File associations
+  "files.associations": {
+    "*.yml": "yaml",
+    "*.yaml": "yaml",
+    "Jenkinsfile": "groovy",
+    ".gitlab-ci.yml": "yaml",
+    "azure-pipelines.yml": "yaml",
+    "bitbucket-pipelines.yml": "yaml"
+  },
+
+  // Testing
+  "rust-analyzer.runnables.extraArgs": ["--", "--nocapture"],
+
+  // Terminal
+  "terminal.integrated.scrollback": 10000,
+
+  // Git
+  "git.confirmSync": false,
+  "git.autofetch": true,
+
+  // Files to exclude from search
+  "search.exclude": {
+    "**/target": true,
+    "**/node_modules": true,
+    "**/.git": true,
+    "**/Cargo.lock": true
+  },
+
+  // Files to hide in explorer
+  "files.exclude": {
+    "**/.git": true,
+    "**/target/debug": true,
+    "**/target/doc": true
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "PipelineX: Analyze CI Pipeline",
+      "type": "shell",
+      "command": "cargo build --release && ./target/release/pipelinex analyze .github/workflows/ci.yml",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "PipelineX: Show Optimizations",
+      "type": "shell",
+      "command": "cargo build --release && ./target/release/pipelinex diff .github/workflows/ci.yml",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "PipelineX: Cost Analysis",
+      "type": "shell",
+      "command": "cargo build --release && ./target/release/pipelinex cost .github/workflows/",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "PipelineX: Generate HTML Report",
+      "type": "shell",
+      "command": "cargo build --release && ./target/release/pipelinex analyze .github/workflows/ci.yml --format html > pipelinex-report.html && xdg-open pipelinex-report.html 2>/dev/null || open pipelinex-report.html 2>/dev/null || start pipelinex-report.html",
+      "group": "test",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "dedicated"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "PipelineX: Run Simulation",
+      "type": "shell",
+      "command": "cargo build --release && ./target/release/pipelinex simulate .github/workflows/ci.yml",
+      "group": "test",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Build: Debug",
+      "type": "cargo",
+      "command": "build",
+      "args": ["--all"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "Build: Release",
+      "type": "cargo",
+      "command": "build",
+      "args": ["--release", "--all"],
+      "group": "build",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "Test: All",
+      "type": "cargo",
+      "command": "test",
+      "args": ["--all"],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "Test: With Output",
+      "type": "cargo",
+      "command": "test",
+      "args": ["--all", "--", "--nocapture"],
+      "group": "test",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "Clippy",
+      "type": "cargo",
+      "command": "clippy",
+      "args": ["--all-targets", "--", "-D", "warnings"],
+      "group": "test",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "Format",
+      "type": "cargo",
+      "command": "fmt",
+      "args": ["--all"],
+      "problemMatcher": []
+    },
+    {
+      "label": "Clean",
+      "type": "cargo",
+      "command": "clean",
+      "problemMatcher": []
+    },
+    {
+      "label": "Install PipelineX Locally",
+      "type": "shell",
+      "command": "cargo install --path crates/pipelinex-cli --force",
+      "problemMatcher": ["$rustc"]
+    }
+  ]
+}
