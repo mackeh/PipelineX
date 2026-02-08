@@ -608,11 +608,13 @@ async fn cmd_history(
     // Get token from argument or environment
     let api_token = token.or_else(|| std::env::var("GITHUB_TOKEN").ok());
 
-    println!("🔍 Analyzing workflow run history...");
-    println!("   Repository: {}/{}", owner, repo_name);
-    println!("   Workflow: {}", workflow_file);
-    println!("   Runs to analyze: {}", runs);
-    println!();
+    if format != "json" {
+        println!("🔍 Analyzing workflow run history...");
+        println!("   Repository: {}/{}", owner, repo_name);
+        println!("   Workflow: {}", workflow_file);
+        println!("   Runs to analyze: {}", runs);
+        println!();
+    }
 
     // Create GitHub API client
     let client = GitHubClient::new(api_token).context("Failed to create GitHub API client")?;

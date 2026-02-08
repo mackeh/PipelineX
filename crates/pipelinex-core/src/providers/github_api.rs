@@ -208,13 +208,13 @@ impl GitHubClient {
         workflow_file: &str,
         run_count: usize,
     ) -> Result<PipelineStatistics> {
-        println!("Fetching {} workflow runs from GitHub...", run_count);
+        eprintln!("Fetching {} workflow runs from GitHub...", run_count);
 
         let runs = self
             .fetch_workflow_runs(owner, repo, workflow_file, run_count)
             .await?;
 
-        println!("Fetched {} runs, analyzing jobs...", runs.len());
+        eprintln!("Fetched {} runs, analyzing jobs...", runs.len());
 
         // Collect job data for all runs
         let mut job_data: std::collections::HashMap<String, Vec<Job>> =
@@ -222,7 +222,7 @@ impl GitHubClient {
 
         for (idx, run) in runs.iter().enumerate() {
             if idx % 10 == 0 {
-                println!("Analyzing run {}/{}...", idx + 1, runs.len());
+                eprintln!("Analyzing run {}/{}...", idx + 1, runs.len());
             }
 
             match self.fetch_jobs(owner, repo, run.id).await {
