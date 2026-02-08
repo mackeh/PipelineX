@@ -124,6 +124,9 @@ pipelinex flaky test-results/
 
 # Smart test selection (run only affected tests)
 pipelinex select-tests HEAD~1 HEAD
+
+# Analyze historical run data from GitHub
+pipelinex history --repo owner/repo --workflow ci.yml --runs 100
 ```
 
 ---
@@ -565,6 +568,7 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 | `docker` | Analyze Dockerfiles | `pipelinex docker Dockerfile --optimize` |
 | `select-tests` | Smart test selection | `pipelinex select-tests HEAD~1 HEAD` |
 | `flaky` | Detect flaky tests | `pipelinex flaky test-results/*.xml` |
+| `history` | Analyze workflow run history | `pipelinex history --repo org/repo --workflow ci.yml --runs 100` |
 
 ### Output Formats
 

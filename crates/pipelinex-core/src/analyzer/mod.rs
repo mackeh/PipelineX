@@ -32,6 +32,23 @@ pub fn analyze(dag: &PipelineDag) -> AnalysisReport {
     let total_duration = critical_path_duration;
     let estimated_optimized = estimate_optimized_duration(&findings, total_duration);
 
+    // Calculate health score
+    let critical_count = findings.iter().filter(|f| f.severity == report::Severity::Critical).count();
+    let high_count = findings.iter().filter(|f| f.severity == report::Severity::High).count();
+    let medium_count = findings.iter().filter(|f| f.severity == report::Severity::Medium).count();
+
+    let calculator = crate::health_score::HealthScoreCalculator::new();
+    let health_score = calculator.calculate(
+        total_duration,
+        estimated_optimized,
+        0.95, // Default to 95% success rate (will be updated with real data if available)
+        dag.max_parallelism() as f64 / dag.job_count().max(1) as f64,
+        detect_has_caching(&findings),
+        critical_count,
+        high_count,
+        medium_count,
+    );
+
     AnalysisReport {
         pipeline_name: dag.name.clone(),
         source_file: dag.source_file.clone(),
@@ -44,7 +61,13 @@ pub fn analyze(dag: &PipelineDag) -> AnalysisReport {
         total_estimated_duration_secs: total_duration,
         optimized_duration_secs: estimated_optimized,
         findings,
+        health_score: Some(health_score),
     }
+}
+
+fn detect_has_caching(findings: &[report::Finding]) -> bool {
+    // If no "Missing Cache" findings, assume caching is present
+    !findings.iter().any(|f| matches!(f.category, report::FindingCategory::MissingCache))
 }
 
 fn estimate_optimized_duration(findings: &[Finding], current_duration: f64) -> f64 {

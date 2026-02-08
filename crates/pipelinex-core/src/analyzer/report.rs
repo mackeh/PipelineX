@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use crate::health_score::{HealthScore, HealthScoreCalculator};
 
 /// Severity level for analysis findings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -114,6 +115,7 @@ pub struct AnalysisReport {
     pub total_estimated_duration_secs: f64,
     pub optimized_duration_secs: f64,
     pub findings: Vec<Finding>,
+    pub health_score: Option<HealthScore>,
 }
 
 impl AnalysisReport {

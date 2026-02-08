@@ -1,6 +1,7 @@
 use colored::*;
 use pipelinex_core::analyzer::report::{AnalysisReport, Finding, Severity, format_duration};
 use pipelinex_core::cost::CostEstimate;
+use pipelinex_core::health_score::HealthScore;
 use pipelinex_core::simulator::SimulationResult;
 use pipelinex_core::optimizer::docker_opt::{DockerAnalysis, DockerSeverity};
 use pipelinex_core::test_selector::TestSelection;
@@ -101,6 +102,17 @@ pub fn print_analysis_report(report: &AnalysisReport) {
         },
         medium,
     );
+
+    // Health score
+    if let Some(ref health) = report.health_score {
+        println!(
+            " {} Pipeline Health: {} {}/100 ({})",
+            "|-".dimmed(),
+            health.grade.emoji(),
+            format!("{:.0}", health.total_score).bold(),
+            health.grade.label().cyan()
+        );
+    }
     println!();
 
     if !report.findings.is_empty() {
