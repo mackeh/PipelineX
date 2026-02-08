@@ -3,11 +3,18 @@ members = ["crates/pipelinex-core", "crates/pipelinex-cli"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 license = "MIT"
+license-file = "LICENSE"
 repository = "https://github.com/mackeh/PipelineX"
-description = "CI/CD Bottleneck Analyzer & Auto-Optimizer"
+homepage = "https://github.com/mackeh/PipelineX"
+documentation = "https://github.com/mackeh/PipelineX#readme"
+readme = "README.md"
+keywords = ["ci-cd", "devops", "optimization", "pipeline", "github-actions"]
+categories = ["command-line-utilities", "development-tools"]
+description = "CI/CD Bottleneck Analyzer & Auto-Optimizer - Make your pipelines 2-10x faster"
+authors = ["mackeh <mackeh2010@gmail.com>"]
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
