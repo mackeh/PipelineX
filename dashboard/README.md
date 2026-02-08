@@ -74,15 +74,34 @@ Query params:
 - `jobCount` (required)
 - `stepCount` (required)
 
+### Public API (keyed)
+
+- `GET /api/public/v1/auth/me`
+- `GET /api/public/v1/benchmarks/stats`
+- `POST /api/public/v1/benchmarks/submit`
+
+Auth header options:
+
+- `Authorization: Bearer <token>`
+- `x-api-key: <token>`
+
 ## Environment variables
 
 - `GITHUB_TOKEN`: used for history refresh calls.
 - `GITHUB_WEBHOOK_SECRET`: enables webhook signature validation.
 - `PIPELINEX_HISTORY_RUNS`: optional lookback window for webhook-triggered refreshes (default `100`).
+- `PIPELINEX_API_KEY`: single-key public API mode.
+- `PIPELINEX_API_KEYS`: JSON array of key configs (supports rotation fields).
+- `PIPELINEX_API_KEYS_FILE`: JSON file path for key config (recommended in production).
+- `PIPELINEX_API_RATE_LIMIT_PER_MINUTE`: default per-key rate limit.
+- `PIPELINEX_PUBLIC_API_RATE_LIMIT_FILE`: override persistent rate-limit store file path.
+- `PIPELINEX_PUBLIC_API_AUDIT_LOG_FILE`: override JSONL audit log file path.
 
 ## Local persistence
 
 - History cache: `.pipelinex/history-cache/`
 - Benchmark registry: `.pipelinex/benchmark-registry.json`
+- Public API rate-limit store: `.pipelinex/public-api-rate-limits.json`
+- Public API audit log: `.pipelinex/public-api-audit.log`
 
 No repository names or workflow paths are stored in benchmark entries.

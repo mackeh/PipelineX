@@ -584,6 +584,7 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 | `select-tests` | Smart test selection                       | `pipelinex select-tests HEAD~1 HEAD`                             |
 | `flaky`        | Detect flaky tests                         | `pipelinex flaky test-results/*.xml`                             |
 | `history`      | Analyze workflow run history               | `pipelinex history --repo org/repo --workflow ci.yml --runs 100` |
+| `plugins`      | Plugin scaffold/list                       | `pipelinex plugins scaffold .pipelinex/plugins.json`             |
 
 ### Output Formats
 
@@ -631,7 +632,7 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 
 |                          | PipelineX       | BuildPulse     | Datadog CI   | Trunk Analytics |
 | ------------------------ | --------------- | -------------- | ------------ | --------------- |
-| **Multi-platform**       | ✅ 5 CI systems | ❌ GitHub only | ✅           | ❌ GitHub only  |
+| **Multi-platform**       | ✅ 8 CI systems | ❌ GitHub only | ✅           | ❌ GitHub only  |
 | **Offline CLI**          | ✅              | ❌ SaaS only   | ❌ SaaS only | ❌ SaaS only    |
 | **Auto-generates fixes** | ✅              | ❌             | ❌           | ❌              |
 | **Smart test selection** | ✅              | ❌             | ❌           | ❌              |
@@ -782,6 +783,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 - [CONTRIBUTING.md](CONTRIBUTING.md) - Contributor guide with templates
 - [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) - Integration patterns
+- [docs/PLUGINS.md](docs/PLUGINS.md) - External plugin manifest and protocol
 - [.github/workflow-templates/](.github/workflow-templates/) - GitHub Actions templates
 - [tests/fixtures/](tests/fixtures/) - Example pipelines
 
