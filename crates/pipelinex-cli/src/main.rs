@@ -8,6 +8,7 @@ use pipelinex_core::parser::azure::AzurePipelinesParser;
 use pipelinex_core::flaky_detector::FlakyDetector;
 use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::parser::bitbucket::BitbucketParser;
+use pipelinex_core::parser::buildkite::BuildkiteParser;
 use pipelinex_core::parser::circleci::CircleCIParser;
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
@@ -279,6 +280,12 @@ fn parse_pipeline(path: &std::path::Path) -> Result<pipelinex_core::PipelineDag>
     {
         BitbucketParser::parse_file(path)
             .with_context(|| format!("Failed to parse Bitbucket Pipelines: {}", path.display()))
+    } else if (filename == "pipeline.yml" || filename == "pipeline.yaml")
+        && path_str.contains(".buildkite")
+        || path_str.contains("buildkite")
+    {
+        BuildkiteParser::parse_file(path)
+            .with_context(|| format!("Failed to parse Buildkite pipeline: {}", path.display()))
     } else {
         // Default to GitHub Actions
         GitHubActionsParser::parse_file(path)

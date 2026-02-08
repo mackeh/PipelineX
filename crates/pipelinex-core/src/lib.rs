@@ -15,6 +15,7 @@ pub use optimizer::Optimizer;
 pub use parser::aws_codepipeline::AwsCodePipelineParser;
 pub use parser::azure::AzurePipelinesParser;
 pub use parser::bitbucket::BitbucketParser;
+pub use parser::buildkite::BuildkiteParser;
 pub use parser::circleci::CircleCIParser;
 pub use parser::dag::{DagEdge, JobNode, PipelineDag, StepInfo};
 pub use parser::github::GitHubActionsParser;
