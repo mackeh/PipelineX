@@ -44,6 +44,10 @@ pipelinex analyze .github/workflows/ci.yml --format html > report.html
 # Smart test selection (run only affected tests)
 pipelinex select-tests HEAD~1 HEAD
 pipelinex select-tests main feature-branch --format json
+
+# Detect flaky tests from test results
+pipelinex flaky test-results/
+pipelinex flaky junit-reports/*.xml --min-runs 5
 ```
 
 ## What It Detects
@@ -164,6 +168,7 @@ graph LR
 | `pipelinex simulate <file>` | Run Monte Carlo simulation of pipeline timing |
 | `pipelinex docker <file>` | Analyze a Dockerfile for optimization opportunities |
 | `pipelinex select-tests <base> <head>` | Smart test selection based on code changes |
+| `pipelinex flaky <paths>` | Detect flaky tests from JUnit XML reports |
 
 ### Options
 
@@ -201,6 +206,12 @@ pipelinex select-tests [OPTIONS] [BASE] [HEAD]
   [HEAD]                  Head commit/branch for comparison [default: HEAD]
   -r, --repo <PATH>       Repository path (defaults to current directory)
   -f, --format <FORMAT>   Output format: text, json, yaml [default: text]
+
+pipelinex flaky [OPTIONS] <PATHS>...
+  <PATHS>...              Paths to JUnit XML files or directories
+  --min-runs <N>          Minimum runs required to detect flakiness [default: 10]
+  --threshold <F>         Flakiness threshold 0.0-1.0 [default: 0.3]
+  -f, --format <FORMAT>   Output format: text, json [default: text]
 ```
 
 ## Architecture
@@ -231,6 +242,7 @@ Dockerfile ──> Docker Analyzer            Optimized YAML/Dockerfile
 - **SARIF Output** — Generates SARIF 2.1.0 reports for GitHub Code Scanning and VS Code integration
 - **Optimization Engine** — Generates optimized YAML configs with caching, parallelization, shallow clones, path filters, concurrency controls, and smart matrix reduction
 - **Smart Test Selector** — Analyzes git diffs to determine which tests need to run based on changed files, supporting Rust, JavaScript/TypeScript, Python, Go, and Java with language-aware test discovery
+- **Flaky Test Detector** — Analyzes JUnit XML reports to identify unstable tests using statistical analysis, categorizes flakiness types (intermittent, timing-dependent, environment-sensitive), and provides actionable recommendations
 
 ### Tech Stack
 
@@ -272,7 +284,8 @@ PipelineX/
 │   │   │   ├── simulator/           # Monte Carlo simulation engine
 │   │   │   ├── graph/               # DAG visualization (Mermaid, DOT, ASCII)
 │   │   │   ├── cost/                # CI/CD cost estimation
-│   │   │   └── test_selector.rs     # Smart test selection based on git diffs
+│   │   │   ├── test_selector.rs     # Smart test selection based on git diffs
+│   │   │   └── flaky_detector.rs    # Flaky test detection from JUnit XML
 │   │   └── tests/
 │   │       └── integration_tests.rs # 17 integration tests
 │   └── pipelinex-cli/               # CLI interface (binary crate)
@@ -323,7 +336,7 @@ PipelineX/
 
 ### Phase 3 (In Progress)
 - [ ] GitHub API integration for historical run data
-- [ ] Flaky test detector
+- [x] Flaky test detector (JUnit XML analysis, flakiness scoring, pattern categorization)
 - [x] Smart test selection engine (git diff analysis, language-aware test discovery)
 - [ ] GitHub App with automatic PR comments
 - [ ] Web dashboard with interactive DAG visualization

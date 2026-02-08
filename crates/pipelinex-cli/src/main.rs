@@ -9,6 +9,7 @@ use pipelinex_core::parser::circleci::CircleCIParser;
 use pipelinex_core::analyzer;
 use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::test_selector::TestSelector;
+use pipelinex_core::flaky_detector::FlakyDetector;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -140,6 +141,24 @@ enum Commands {
         #[arg(short, long, default_value = "text")]
         format: String,
     },
+
+    /// Detect flaky tests from JUnit XML reports
+    Flaky {
+        /// Paths to JUnit XML files or directory containing them
+        paths: Vec<PathBuf>,
+
+        /// Minimum runs required to detect flakiness
+        #[arg(long, default_value = "10")]
+        min_runs: usize,
+
+        /// Flakiness threshold (0.0-1.0)
+        #[arg(long, default_value = "0.3")]
+        threshold: f64,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
 }
 
 fn main() -> Result<()> {
@@ -163,6 +182,9 @@ fn main() -> Result<()> {
         }
         Commands::SelectTests { base, head, repo, format } => {
             cmd_select_tests(&base, &head, repo.as_deref(), &format)
+        }
+        Commands::Flaky { paths, min_runs, threshold, format } => {
+            cmd_flaky(&paths, min_runs, threshold, &format)
         }
     }
 }
@@ -449,6 +471,54 @@ fn cmd_select_tests(
         }
         _ => {
             display::print_test_selection(&selection);
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_flaky(
+    paths: &[PathBuf],
+    min_runs: usize,
+    threshold: f64,
+    format: &str,
+) -> Result<()> {
+    if paths.is_empty() {
+        anyhow::bail!("No paths provided. Specify JUnit XML files or directories.");
+    }
+
+    // Collect all JUnit XML files
+    let mut junit_files = Vec::new();
+    for path in paths {
+        if path.is_file() {
+            if path.extension().and_then(|e| e.to_str()) == Some("xml") {
+                junit_files.push(path.clone());
+            }
+        } else if path.is_dir() {
+            // Find all XML files in directory
+            let pattern = format!("{}/**/*.xml", path.display());
+            let files: Vec<PathBuf> = glob::glob(&pattern)
+                .context("Failed to read glob pattern")?
+                .filter_map(|r| r.ok())
+                .collect();
+            junit_files.extend(files);
+        }
+    }
+
+    if junit_files.is_empty() {
+        anyhow::bail!("No JUnit XML files found in provided paths");
+    }
+
+    let detector = FlakyDetector::with_config(min_runs, threshold);
+    let report = detector.analyze_junit_files(&junit_files)?;
+
+    match format {
+        "json" => {
+            let json = serde_json::to_string_pretty(&report)?;
+            println!("{}", json);
+        }
+        _ => {
+            display::print_flaky_report(&report, &junit_files);
         }
     }
 

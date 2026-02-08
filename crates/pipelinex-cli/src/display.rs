@@ -4,8 +4,9 @@ use pipelinex_core::cost::CostEstimate;
 use pipelinex_core::simulator::SimulationResult;
 use pipelinex_core::optimizer::docker_opt::{DockerAnalysis, DockerSeverity};
 use pipelinex_core::test_selector::TestSelection;
+use pipelinex_core::flaky_detector::{FlakyReport, FlakyCategory};
 use similar::{ChangeTag, TextDiff};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Print a full analysis report to the terminal.
 pub fn print_analysis_report(report: &AnalysisReport) {
@@ -505,6 +506,140 @@ pub fn print_test_selection(selection: &TestSelection) {
         "pipelinex select-tests --format json".cyan()
     );
     println!("  {} Configure your CI to run only the selected test patterns",
+        "|".dimmed()
+    );
+    println!();
+}
+
+/// Print flaky test detection report to the terminal.
+pub fn print_flaky_report(report: &FlakyReport, files: &[PathBuf]) {
+    println!();
+    println!(
+        "{}",
+        format!(" PipelineX v{} — Flaky Test Detector", env!("CARGO_PKG_VERSION")).bold()
+    );
+    println!();
+
+    // Input files
+    println!(" {}", "Input Files".bold().underline());
+    for (i, file) in files.iter().enumerate() {
+        if i < 5 {
+            println!(" {} {}", "|-".dimmed(), file.display());
+        } else if i == 5 {
+            println!(" {} ... ({} more files)", "|-".dimmed(), files.len() - 5);
+            break;
+        }
+    }
+    println!();
+
+    // Summary
+    println!(" {}", "Detection Summary".bold().underline());
+    println!(" {} Total tests analyzed: {}", "|-".dimmed(), report.total_tests);
+    println!(
+        " {} Flaky tests found: {}",
+        "|-".dimmed(),
+        if report.flaky_tests.is_empty() {
+            format!("{}", report.flaky_tests.len()).green()
+        } else {
+            format!("{}", report.flaky_tests.len()).red()
+        }
+    );
+    println!(
+        " {} Flakiness ratio: {:.1}%",
+        "|-".dimmed(),
+        report.flakiness_ratio * 100.0
+    );
+    println!(
+        " {} Confidence: {}",
+        "|-".dimmed(),
+        match report.confidence.as_str() {
+            "High" => report.confidence.green(),
+            "Medium" => report.confidence.yellow(),
+            _ => report.confidence.red(),
+        }
+    );
+    println!();
+
+    if report.flaky_tests.is_empty() {
+        println!(" {} {}", "✓".green().bold(), "No flaky tests detected! All tests are stable.".green());
+        println!();
+        return;
+    }
+
+    // Flaky tests details
+    println!(" {}", "=".repeat(60).dimmed());
+    println!();
+
+    for (i, test) in report.flaky_tests.iter().enumerate() {
+        if i >= 20 {
+            println!(" ... and {} more flaky tests", report.flaky_tests.len() - 20);
+            break;
+        }
+
+        let score_display = format!("{:.0}%", test.flakiness_score * 100.0);
+        let score_colored = if test.flakiness_score >= 0.7 {
+            score_display.red().bold()
+        } else if test.flakiness_score >= 0.5 {
+            score_display.yellow()
+        } else {
+            score_display.normal()
+        };
+
+        println!(" {} Flakiness: {}", "FLAKY".on_red().white().bold(), score_colored);
+        println!("   {} {}", "|".dimmed(), test.name.bold());
+        println!(
+            "   {} Category: {}",
+            "|".dimmed(),
+            match test.category {
+                FlakyCategory::Intermittent => "Intermittent (< 50% failure rate)".yellow(),
+                FlakyCategory::Unstable => "Unstable (alternating pass/fail)".red(),
+                FlakyCategory::EnvironmentSensitive => "Environment-Sensitive (network, timeouts)".cyan(),
+                FlakyCategory::TimingDependent => "Timing-Dependent (race conditions)".magenta(),
+            }
+        );
+        println!(
+            "   {} Runs: {} | Passed: {} | Failed: {} | Failure rate: {:.1}%",
+            "|".dimmed(),
+            test.total_runs,
+            test.passes.to_string().green(),
+            test.failures.to_string().red(),
+            test.failure_rate * 100.0
+        );
+
+        if !test.recent_failures.is_empty() {
+            println!("   {} Recent failures:", "|".dimmed());
+            for (j, error) in test.recent_failures.iter().enumerate() {
+                if j >= 2 {
+                    break;
+                }
+                let truncated = if error.len() > 80 {
+                    format!("{}...", &error[..77])
+                } else {
+                    error.clone()
+                };
+                println!("   {}   - {}", "|".dimmed(), truncated.dimmed());
+            }
+        }
+        println!();
+    }
+
+    println!(" {}", "=".repeat(60).dimmed());
+    println!();
+
+    // Recommendations
+    println!(" {}", "Recommendations".bold().underline());
+    println!(" {} Quarantine flaky tests to prevent blocking CI", "|-".dimmed());
+    println!(" {} Investigate timing-dependent tests for race conditions", "|-".dimmed());
+    println!(" {} Add retries for environment-sensitive tests", "|-".dimmed());
+    println!(" {} Track flakiness over time to identify trends", "|-".dimmed());
+    println!();
+
+    println!(" {} Next steps:", "Tip".green().bold());
+    println!("  {} Run {} to get JSON output",
+        "|".dimmed(),
+        "pipelinex flaky <path> --format json".cyan()
+    );
+    println!("  {} Integrate with your CI to automatically detect new flaky tests",
         "|".dimmed()
     );
     println!();
