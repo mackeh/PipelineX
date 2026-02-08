@@ -113,10 +113,37 @@ export interface BenchmarkStats {
   finding_median: number;
 }
 
+export interface OptimizationImpactEntry {
+  id: string;
+  schema_version: number;
+  tracked_at: string;
+  source: string;
+  provider: string;
+  baseline_duration_secs: number;
+  optimized_duration_secs: number;
+  savings_per_run_secs: number;
+  savings_pct: number;
+  runs_per_month: number;
+  minutes_saved_per_month: number;
+  hours_saved_per_month: number;
+}
+
+export interface OptimizationImpactStats {
+  sample_count: number;
+  source: string;
+  provider: string;
+  avg_minutes_saved_per_month: number;
+  median_minutes_saved_per_month: number;
+  p75_minutes_saved_per_month: number;
+  total_minutes_saved_per_month: number;
+  total_hours_saved_per_month: number;
+}
+
 const PIPELINE_EXTENSIONS = [".yml", ".yaml", ".groovy", ".jenkinsfile"];
 const SEARCH_ROOTS = [".github/workflows", "tests/fixtures"];
 const HISTORY_CACHE_RELATIVE_DIR = ".pipelinex/history-cache";
 const BENCHMARK_REGISTRY_RELATIVE_PATH = ".pipelinex/benchmark-registry.json";
+const IMPACT_REGISTRY_RELATIVE_PATH = ".pipelinex/optimization-impact-registry.json";
 
 function pathExists(filePath: string): Promise<boolean> {
   return access(filePath, constants.F_OK)
@@ -562,6 +589,45 @@ async function writeBenchmarkRegistry(entries: BenchmarkEntry[]): Promise<void> 
   await writeFile(filePath, JSON.stringify(retained, null, 2), "utf8");
 }
 
+function impactRegistryPath(repoRoot: string): string {
+  return path.join(repoRoot, IMPACT_REGISTRY_RELATIVE_PATH);
+}
+
+async function readImpactRegistry(): Promise<OptimizationImpactEntry[]> {
+  const repoRoot = await getRepoRoot();
+  const filePath = impactRegistryPath(repoRoot);
+
+  if (!(await pathExists(filePath))) {
+    return [];
+  }
+
+  const raw = await readFile(filePath, "utf8");
+  if (!raw.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as OptimizationImpactEntry[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+async function writeImpactRegistry(entries: OptimizationImpactEntry[]): Promise<void> {
+  const repoRoot = await getRepoRoot();
+  const filePath = impactRegistryPath(repoRoot);
+  const parentDir = path.dirname(filePath);
+  await mkdir(parentDir, { recursive: true });
+
+  // Keep the local registry bounded to avoid unbounded growth.
+  const retained = entries.slice(-5000);
+  await writeFile(filePath, JSON.stringify(retained, null, 2), "utf8");
+}
+
 function buildBenchmarkEntry(report: AnalysisReport, source: string): BenchmarkEntry {
   const criticalCount = report.findings.filter(
     (finding) => finding.severity.toLowerCase() === "critical",
@@ -661,6 +727,19 @@ interface BenchmarkQuery {
   stepCount: number;
 }
 
+interface TrackOptimizationImpactInput {
+  source?: string;
+  provider?: string;
+  beforeDurationSecs: number;
+  afterDurationSecs: number;
+  runsPerMonth: number;
+}
+
+interface OptimizationImpactQuery {
+  source?: string;
+  provider?: string;
+}
+
 export async function queryBenchmarkStats(
   query: BenchmarkQuery,
 ): Promise<BenchmarkStats | null> {
@@ -711,4 +790,121 @@ export async function submitBenchmarkReport(
   }
 
   return { entry, stats };
+}
+
+function assertPositiveFinite(value: number, fieldName: string): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${fieldName} must be a positive number.`);
+  }
+  return value;
+}
+
+function buildOptimizationImpactEntry(
+  input: TrackOptimizationImpactInput,
+): OptimizationImpactEntry {
+  const source = input.source?.trim() || "dashboard";
+  const provider = input.provider?.trim() || "unknown";
+  const beforeDurationSecs = assertPositiveFinite(
+    input.beforeDurationSecs,
+    "beforeDurationSecs",
+  );
+  const afterDurationSecs = assertPositiveFinite(input.afterDurationSecs, "afterDurationSecs");
+  const runsPerMonth = Math.floor(
+    assertPositiveFinite(input.runsPerMonth, "runsPerMonth"),
+  );
+
+  const savingsPerRunSecs = Math.max(0, beforeDurationSecs - afterDurationSecs);
+  const savingsPct = (savingsPerRunSecs / Math.max(1, beforeDurationSecs)) * 100;
+  const savingsPerMonthSecs = savingsPerRunSecs * runsPerMonth;
+  const minutesSavedPerMonth = savingsPerMonthSecs / 60;
+
+  return {
+    id: randomUUID(),
+    schema_version: 1,
+    tracked_at: new Date().toISOString(),
+    source,
+    provider,
+    baseline_duration_secs: beforeDurationSecs,
+    optimized_duration_secs: afterDurationSecs,
+    savings_per_run_secs: savingsPerRunSecs,
+    savings_pct: Math.max(0, savingsPct),
+    runs_per_month: runsPerMonth,
+    minutes_saved_per_month: Math.max(0, minutesSavedPerMonth),
+    hours_saved_per_month: Math.max(0, minutesSavedPerMonth / 60),
+  };
+}
+
+export async function trackOptimizationImpact(
+  input: TrackOptimizationImpactInput,
+): Promise<{ entry: OptimizationImpactEntry; stats: OptimizationImpactStats }> {
+  const entry = buildOptimizationImpactEntry(input);
+  const entries = await readImpactRegistry();
+  entries.push(entry);
+  await writeImpactRegistry(entries);
+
+  const stats = await queryOptimizationImpactStats({
+    source: entry.source,
+    provider: entry.provider,
+  });
+
+  if (!stats) {
+    throw new Error("Failed to compute optimization impact stats after submission.");
+  }
+
+  return { entry, stats };
+}
+
+export async function trackOptimizationImpactFromReport(
+  report: AnalysisReport,
+  runsPerMonth: number,
+  source = "dashboard",
+): Promise<{ entry: OptimizationImpactEntry; stats: OptimizationImpactStats }> {
+  return trackOptimizationImpact({
+    source,
+    provider: report.provider,
+    beforeDurationSecs: report.total_estimated_duration_secs,
+    afterDurationSecs: report.optimized_duration_secs,
+    runsPerMonth,
+  });
+}
+
+export async function queryOptimizationImpactStats(
+  query: OptimizationImpactQuery = {},
+): Promise<OptimizationImpactStats | null> {
+  const sourceFilter = query.source?.trim();
+  const providerFilter = query.provider?.trim();
+  const entries = await readImpactRegistry();
+
+  if (entries.length === 0) {
+    return null;
+  }
+
+  const matching = entries.filter((entry) => {
+    if (sourceFilter && entry.source !== sourceFilter) {
+      return false;
+    }
+    if (providerFilter && entry.provider !== providerFilter) {
+      return false;
+    }
+    return true;
+  });
+
+  if (matching.length === 0) {
+    return null;
+  }
+
+  const minutesValues = matching.map((entry) => entry.minutes_saved_per_month);
+  const totalMinutes = minutesValues.reduce((acc, value) => acc + value, 0);
+  const averageMinutes = totalMinutes / Math.max(1, minutesValues.length);
+
+  return {
+    sample_count: matching.length,
+    source: sourceFilter || "all",
+    provider: providerFilter || "all",
+    avg_minutes_saved_per_month: averageMinutes,
+    median_minutes_saved_per_month: median(minutesValues),
+    p75_minutes_saved_per_month: percentile(minutesValues, 75),
+    total_minutes_saved_per_month: totalMinutes,
+    total_hours_saved_per_month: totalMinutes / 60,
+  };
 }

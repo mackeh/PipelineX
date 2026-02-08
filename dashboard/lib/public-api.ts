@@ -15,7 +15,9 @@ export type PublicApiScope =
   | "workflows:read"
   | "analysis:run"
   | "history:read"
-  | "history:write";
+  | "history:write"
+  | "impact:read"
+  | "impact:write";
 
 export type PublicApiRole = "admin" | "analyst" | "ingest" | "viewer" | "auditor";
 
@@ -114,6 +116,8 @@ const ROLE_SCOPES: Record<PublicApiRole, PublicApiScope[]> = {
     "analysis:run",
     "history:read",
     "history:write",
+    "impact:read",
+    "impact:write",
   ],
   analyst: [
     "benchmarks:read",
@@ -121,9 +125,10 @@ const ROLE_SCOPES: Record<PublicApiRole, PublicApiScope[]> = {
     "workflows:read",
     "analysis:run",
     "history:read",
+    "impact:read",
   ],
-  ingest: ["benchmarks:write", "analysis:run", "history:write"],
-  viewer: ["benchmarks:read", "workflows:read", "history:read"],
+  ingest: ["benchmarks:write", "analysis:run", "history:write", "impact:write"],
+  viewer: ["benchmarks:read", "workflows:read", "history:read", "impact:read"],
   auditor: ["audit:read"],
 };
 
@@ -173,6 +178,8 @@ function normalizeScopes(rawScopes: unknown): PublicApiScope[] {
     "analysis:run",
     "history:read",
     "history:write",
+    "impact:read",
+    "impact:write",
   ];
   return rawScopes.filter((scope): scope is PublicApiScope =>
     typeof scope === "string" ? allowed.includes(scope as PublicApiScope) : false,
@@ -405,6 +412,8 @@ async function parseConfiguredApiKeys(): Promise<ApiKeyConfig[]> {
           "analysis:run",
           "history:read",
           "history:write",
+          "impact:read",
+          "impact:write",
         ],
       ),
       roles: directRoles,

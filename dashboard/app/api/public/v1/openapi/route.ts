@@ -32,6 +32,8 @@ const OPENAPI_SPEC = {
       get: { summary: "List or fetch cached history snapshots" },
       post: { summary: "Refresh workflow history snapshot" },
     },
+    "/impact/stats": { get: { summary: "Query optimization impact savings metrics" } },
+    "/impact/track": { post: { summary: "Track optimization impact event" } },
     "/benchmarks/stats": { get: { summary: "Get benchmark cohort stats" } },
     "/benchmarks/submit": { post: { summary: "Submit benchmark report" } },
     "/audit/logs": { get: { summary: "Query public API audit logs" } },

@@ -7,7 +7,9 @@ export type EnterpriseScope =
   | "workflows:read"
   | "analysis:run"
   | "history:read"
-  | "history:write";
+  | "history:write"
+  | "impact:read"
+  | "impact:write";
 
 export type EnterpriseRole = "admin" | "analyst" | "ingest" | "viewer" | "auditor";
 
@@ -76,6 +78,8 @@ const ROLE_SCOPES: Record<EnterpriseRole, EnterpriseScope[]> = {
     "analysis:run",
     "history:read",
     "history:write",
+    "impact:read",
+    "impact:write",
   ],
   analyst: [
     "benchmarks:read",
@@ -83,9 +87,10 @@ const ROLE_SCOPES: Record<EnterpriseRole, EnterpriseScope[]> = {
     "workflows:read",
     "analysis:run",
     "history:read",
+    "impact:read",
   ],
-  ingest: ["benchmarks:write", "analysis:run", "history:write"],
-  viewer: ["benchmarks:read", "workflows:read", "history:read"],
+  ingest: ["benchmarks:write", "analysis:run", "history:write", "impact:write"],
+  viewer: ["benchmarks:read", "workflows:read", "history:read", "impact:read"],
   auditor: ["audit:read"],
 };
 
@@ -143,6 +148,8 @@ function normalizeScopes(rawScopes: unknown): EnterpriseScope[] {
     "analysis:run",
     "history:read",
     "history:write",
+    "impact:read",
+    "impact:write",
   ];
   return rawScopes.filter((scope): scope is EnterpriseScope =>
     typeof scope === "string" ? allowed.includes(scope as EnterpriseScope) : false,
