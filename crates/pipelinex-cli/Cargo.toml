@@ -14,6 +14,7 @@ pipelinex-core = { path = "../pipelinex-core" }
 clap = { workspace = true }
 colored = { workspace = true }
 anyhow = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
 serde_yaml = { workspace = true }
 similar = { workspace = true }

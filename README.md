@@ -40,6 +40,10 @@ pipelinex docker Dockerfile --optimize
 
 # Generate interactive HTML report
 pipelinex analyze .github/workflows/ci.yml --format html > report.html
+
+# Smart test selection (run only affected tests)
+pipelinex select-tests HEAD~1 HEAD
+pipelinex select-tests main feature-branch --format json
 ```
 
 ## What It Detects
@@ -159,6 +163,7 @@ graph LR
 | `pipelinex graph <file>` | Generate a visual pipeline DAG diagram |
 | `pipelinex simulate <file>` | Run Monte Carlo simulation of pipeline timing |
 | `pipelinex docker <file>` | Analyze a Dockerfile for optimization opportunities |
+| `pipelinex select-tests <base> <head>` | Smart test selection based on code changes |
 
 ### Options
 
@@ -190,6 +195,12 @@ pipelinex simulate [OPTIONS] <PATH>
 pipelinex docker [OPTIONS] <PATH>
   --optimize              Output an optimized Dockerfile
   -o, --output <FILE>     Write optimized Dockerfile to file
+
+pipelinex select-tests [OPTIONS] [BASE] [HEAD]
+  [BASE]                  Base commit/branch for comparison [default: HEAD~1]
+  [HEAD]                  Head commit/branch for comparison [default: HEAD]
+  -r, --repo <PATH>       Repository path (defaults to current directory)
+  -f, --format <FORMAT>   Output format: text, json, yaml [default: text]
 ```
 
 ## Architecture
@@ -219,6 +230,7 @@ Dockerfile ──> Docker Analyzer            Optimized YAML/Dockerfile
 - **Docker Build Optimizer** — Analyzes Dockerfiles for multi-stage build opportunities, cache-busting COPY patterns, bloated base images, and security issues
 - **SARIF Output** — Generates SARIF 2.1.0 reports for GitHub Code Scanning and VS Code integration
 - **Optimization Engine** — Generates optimized YAML configs with caching, parallelization, shallow clones, path filters, concurrency controls, and smart matrix reduction
+- **Smart Test Selector** — Analyzes git diffs to determine which tests need to run based on changed files, supporting Rust, JavaScript/TypeScript, Python, Go, and Java with language-aware test discovery
 
 ### Tech Stack
 
@@ -259,7 +271,8 @@ PipelineX/
 │   │   │   │   └── docker_opt.rs    # Dockerfile analysis & optimization
 │   │   │   ├── simulator/           # Monte Carlo simulation engine
 │   │   │   ├── graph/               # DAG visualization (Mermaid, DOT, ASCII)
-│   │   │   └── cost/                # CI/CD cost estimation
+│   │   │   ├── cost/                # CI/CD cost estimation
+│   │   │   └── test_selector.rs     # Smart test selection based on git diffs
 │   │   └── tests/
 │   │       └── integration_tests.rs # 17 integration tests
 │   └── pipelinex-cli/               # CLI interface (binary crate)
@@ -305,13 +318,13 @@ PipelineX/
 - [x] SARIF 2.1.0 output for GitHub Code Scanning / IDE integration
 - [x] Interactive HTML reports with DAG visualization and dark mode
 - [x] GitHub Actions CI pipeline for PipelineX itself
-- [x] 53 tests (30 unit + 23 integration) across all modules
+- [x] 57 tests (34 unit + 23 integration) across all modules
 - [x] 19 test fixtures (GitHub Actions, GitLab CI, Jenkins, CircleCI, Dockerfiles)
 
-### Phase 3 (Planned)
+### Phase 3 (In Progress)
 - [ ] GitHub API integration for historical run data
 - [ ] Flaky test detector
-- [ ] Smart test selection
+- [x] Smart test selection engine (git diff analysis, language-aware test discovery)
 - [ ] GitHub App with automatic PR comments
 - [ ] Web dashboard with interactive DAG visualization
 - [ ] Slack/Teams weekly digest reports

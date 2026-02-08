@@ -3,6 +3,7 @@ use pipelinex_core::analyzer::report::{AnalysisReport, Finding, Severity, format
 use pipelinex_core::cost::CostEstimate;
 use pipelinex_core::simulator::SimulationResult;
 use pipelinex_core::optimizer::docker_opt::{DockerAnalysis, DockerSeverity};
+use pipelinex_core::test_selector::TestSelection;
 use similar::{ChangeTag, TextDiff};
 use std::path::Path;
 
@@ -414,5 +415,97 @@ pub fn print_docker_analysis(path: &Path, analysis: &DockerAnalysis) {
             format!("pipelinex docker {} --optimize", path.display()).cyan()
         );
     }
+    println!();
+}
+
+/// Print test selection results to the terminal.
+pub fn print_test_selection(selection: &TestSelection) {
+    println!();
+    println!(
+        "{}",
+        format!(" PipelineX v{} — Smart Test Selection", env!("CARGO_PKG_VERSION")).bold()
+    );
+    println!();
+
+    // Changed files
+    println!(" {}", "Changed Files".bold().underline());
+    if selection.changed_files.is_empty() {
+        println!(" {} No changes detected", "|".dimmed());
+    } else {
+        for (i, file) in selection.changed_files.iter().enumerate() {
+            if i < 10 {
+                println!(" {} {}", "|-".dimmed(), file.display());
+            } else if i == 10 {
+                println!(" {} ... ({} more files)", "|-".dimmed(), selection.changed_files.len() - 10);
+                break;
+            }
+        }
+    }
+    println!();
+
+    // Selected tests
+    println!(" {}", "Selected Tests".bold().underline());
+    if selection.selected_tests.is_empty() {
+        println!(" {} No specific tests selected — run all tests", "|".dimmed());
+    } else if selection.selected_tests.contains(&"all".to_string()) {
+        println!(
+            " {} {} Critical changes detected — running all tests",
+            "|-".dimmed(),
+            "⚠".yellow()
+        );
+    } else {
+        for test in &selection.selected_tests {
+            println!(" {} {}", "|-".dimmed(), test.cyan());
+        }
+    }
+    println!();
+
+    // Test patterns (for CI config)
+    if !selection.test_patterns.is_empty() {
+        println!(" {}", "Test Patterns (for CI config)".bold().underline());
+        for pattern in &selection.test_patterns {
+            println!(" {} {}", "|-".dimmed(), pattern.yellow());
+        }
+        println!();
+    }
+
+    // Selection ratio
+    println!(" {}", "Selection Summary".bold().underline());
+    if selection.selection_ratio > 0.0 {
+        println!(
+            " {} Running ~{:.0}% of tests based on changes",
+            "|-".dimmed(),
+            selection.selection_ratio * 100.0
+        );
+        println!(
+            " {} Est. time savings: {:.0}%",
+            "|-".dimmed(),
+            (1.0 - selection.selection_ratio) * 100.0
+        );
+    } else {
+        println!(" {} No tests selected — changes may not affect test code", "|-".dimmed());
+    }
+    println!();
+
+    // Reasoning
+    if !selection.reasoning.is_empty() {
+        println!(" {}", "Reasoning".bold().underline());
+        for reason in &selection.reasoning {
+            println!(" {} {}", "|-".dimmed(), reason);
+        }
+        println!();
+    }
+
+    // Usage hints
+    println!(" {}", "=".repeat(60).dimmed());
+    println!();
+    println!(" {} Integration with CI:", "Tip".green().bold());
+    println!("  {} Use {} to get patterns as JSON/YAML",
+        "|".dimmed(),
+        "pipelinex select-tests --format json".cyan()
+    );
+    println!("  {} Configure your CI to run only the selected test patterns",
+        "|".dimmed()
+    );
     println!();
 }

@@ -8,6 +8,7 @@ use pipelinex_core::parser::jenkins::JenkinsParser;
 use pipelinex_core::parser::circleci::CircleCIParser;
 use pipelinex_core::analyzer;
 use pipelinex_core::optimizer::Optimizer;
+use pipelinex_core::test_selector::TestSelector;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -120,6 +121,25 @@ enum Commands {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+
+    /// Select tests to run based on code changes (smart test selection)
+    SelectTests {
+        /// Base commit/branch for comparison
+        #[arg(default_value = "HEAD~1")]
+        base: String,
+
+        /// Head commit/branch for comparison
+        #[arg(default_value = "HEAD")]
+        head: String,
+
+        /// Repository path
+        #[arg(short, long)]
+        repo: Option<PathBuf>,
+
+        /// Output format (text, json, yaml)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
 }
 
 fn main() -> Result<()> {
@@ -140,6 +160,9 @@ fn main() -> Result<()> {
         }
         Commands::Docker { path, optimize, output } => {
             cmd_docker(&path, optimize, output.as_deref())
+        }
+        Commands::SelectTests { base, head, repo, format } => {
+            cmd_select_tests(&base, &head, repo.as_deref(), &format)
         }
     }
 }
@@ -367,6 +390,66 @@ fn cmd_docker(path: &PathBuf, optimize: bool, output: Option<&std::path::Path>) 
         }
     } else {
         display::print_docker_analysis(path, &analysis);
+    }
+
+    Ok(())
+}
+
+fn cmd_select_tests(
+    base: &str,
+    head: &str,
+    repo: Option<&std::path::Path>,
+    format: &str,
+) -> Result<()> {
+    let selector = TestSelector::new();
+    let selection = selector.select_from_git_diff(base, head, repo)?;
+
+    match format {
+        "json" => {
+            #[derive(serde::Serialize)]
+            struct Output {
+                changed_files: Vec<String>,
+                selected_tests: Vec<String>,
+                test_patterns: Vec<String>,
+                selection_ratio: f64,
+                reasoning: Vec<String>,
+            }
+
+            let output = Output {
+                changed_files: selection.changed_files.iter().map(|p| p.display().to_string()).collect(),
+                selected_tests: selection.selected_tests,
+                test_patterns: selection.test_patterns,
+                selection_ratio: selection.selection_ratio,
+                reasoning: selection.reasoning,
+            };
+
+            let json = serde_json::to_string_pretty(&output)?;
+            println!("{}", json);
+        }
+        "yaml" => {
+            #[derive(serde::Serialize)]
+            struct Output {
+                changed_files: Vec<String>,
+                selected_tests: Vec<String>,
+                test_patterns: Vec<String>,
+                selection_ratio: f64,
+                reasoning: Vec<String>,
+            }
+
+            let output = Output {
+                changed_files: selection.changed_files.iter().map(|p| p.display().to_string()).collect(),
+                selected_tests: selection.selected_tests,
+                test_patterns: selection.test_patterns,
+                selection_ratio: selection.selection_ratio,
+                reasoning: selection.reasoning,
+            };
+
+            let yaml = serde_yaml::to_string(&output)?;
+            println!("{}", yaml);
+        }
+        _ => {
+            display::print_test_selection(&selection);
+        }
     }
 
     Ok(())

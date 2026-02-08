@@ -4,6 +4,7 @@ pub mod optimizer;
 pub mod cost;
 pub mod simulator;
 pub mod graph;
+pub mod test_selector;
 
 pub use parser::dag::{PipelineDag, JobNode, StepInfo, DagEdge};
 pub use parser::github::GitHubActionsParser;
@@ -12,3 +13,4 @@ pub use parser::jenkins::JenkinsParser;
 pub use parser::circleci::CircleCIParser;
 pub use analyzer::report::{AnalysisReport, Finding, Severity};
 pub use optimizer::Optimizer;
+pub use test_selector::{TestSelector, TestSelection, TestSelectorConfig};
