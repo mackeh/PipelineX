@@ -277,6 +277,72 @@ export interface FlakyManagementSummary {
   jobs: FlakyJobEntry[];
 }
 
+export type UserRole = "admin" | "member" | "viewer";
+
+export interface TeamMember {
+  user_id: string;
+  email: string;
+  name?: string;
+  role: UserRole;
+  joined_at: string;
+}
+
+export interface Team {
+  id: string;
+  name: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+  members: TeamMember[];
+  settings: {
+    pipeline_paths?: string[];
+    default_runs_per_month?: number;
+    default_developer_rate?: number;
+    alert_channels?: {
+      slack_webhook?: string;
+      teams_webhook?: string;
+      email_recipients?: string[];
+    };
+  };
+}
+
+export interface TeamCreateInput {
+  name: string;
+  description?: string;
+  settings?: Team["settings"];
+}
+
+export interface TeamUpdateInput {
+  name?: string;
+  description?: string;
+  settings?: Team["settings"];
+}
+
+export interface AddTeamMemberInput {
+  user_id: string;
+  email: string;
+  name?: string;
+  role: UserRole;
+}
+
+export interface OrgLevelMetrics {
+  total_teams: number;
+  total_pipelines: number;
+  total_findings: number;
+  avg_health_score: number;
+  total_monthly_cost: number;
+  total_time_saved_per_month: number;
+  teams_summary: {
+    team_id: string;
+    team_name: string;
+    pipeline_count: number;
+    avg_duration_secs: number;
+    total_findings: number;
+    health_score: number;
+    monthly_cost: number;
+  }[];
+}
+
 const PIPELINE_EXTENSIONS = [".yml", ".yaml", ".groovy", ".jenkinsfile"];
 const SEARCH_ROOTS = [".github/workflows", "tests/fixtures"];
 const HISTORY_CACHE_RELATIVE_DIR = ".pipelinex/history-cache";
@@ -285,6 +351,7 @@ const IMPACT_REGISTRY_RELATIVE_PATH = ".pipelinex/optimization-impact-registry.j
 const ALERT_RULES_RELATIVE_PATH = ".pipelinex/alert-rules.json";
 const DIGEST_EMAIL_OUTBOX_RELATIVE_PATH = ".pipelinex/digest-email-outbox.jsonl";
 const FLAKY_MANAGEMENT_RELATIVE_PATH = ".pipelinex/flaky-management.json";
+const TEAMS_REGISTRY_RELATIVE_PATH = ".pipelinex/teams-registry.json";
 
 function pathExists(filePath: string): Promise<boolean> {
   return access(filePath, constants.F_OK)
@@ -2052,4 +2119,276 @@ export async function deliverWeeklyDigest(
   }
 
   return result;
+}
+
+// ============================================================================
+// Team Management
+// ============================================================================
+
+/**
+ * List all teams from the teams registry
+ */
+export async function listTeams(): Promise<Team[]> {
+  const repoRoot = await getRepoRoot();
+  const teamsPath = path.join(repoRoot, TEAMS_REGISTRY_RELATIVE_PATH);
+
+  const exists = await pathExists(teamsPath);
+  if (!exists) {
+    return [];
+  }
+
+  const content = await readFile(teamsPath, "utf-8");
+  const data = JSON.parse(content) as { teams: Team[] };
+  return data.teams || [];
+}
+
+/**
+ * Get a specific team by ID
+ */
+export async function getTeam(teamId: string): Promise<Team | null> {
+  const teams = await listTeams();
+  return teams.find((t) => t.id === teamId) || null;
+}
+
+/**
+ * Create a new team
+ */
+export async function createTeam(input: TeamCreateInput): Promise<Team> {
+  const repoRoot = await getRepoRoot();
+  const teamsPath = path.join(repoRoot, TEAMS_REGISTRY_RELATIVE_PATH);
+
+  // Load existing teams
+  let teams: Team[] = [];
+  const exists = await pathExists(teamsPath);
+  if (exists) {
+    const content = await readFile(teamsPath, "utf-8");
+    const data = JSON.parse(content) as { teams: Team[] };
+    teams = data.teams || [];
+  }
+
+  // Create new team
+  const now = new Date().toISOString();
+  const newTeam: Team = {
+    id: `team-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+    name: input.name,
+    description: input.description,
+    created_at: now,
+    updated_at: now,
+    members: [],
+    settings: input.settings || {},
+  };
+
+  teams.push(newTeam);
+
+  // Ensure directory exists
+  await mkdir(path.dirname(teamsPath), { recursive: true });
+
+  // Save updated registry
+  await writeFile(teamsPath, JSON.stringify({ teams }, null, 2), "utf-8");
+
+  return newTeam;
+}
+
+/**
+ * Update an existing team
+ */
+export async function updateTeam(
+  teamId: string,
+  input: TeamUpdateInput,
+): Promise<Team> {
+  const repoRoot = await getRepoRoot();
+  const teamsPath = path.join(repoRoot, TEAMS_REGISTRY_RELATIVE_PATH);
+
+  const teams = await listTeams();
+  const teamIndex = teams.findIndex((t) => t.id === teamId);
+
+  if (teamIndex === -1) {
+    throw new Error(`Team not found: ${teamId}`);
+  }
+
+  // Update team
+  const team = teams[teamIndex];
+  if (input.name !== undefined) team.name = input.name;
+  if (input.description !== undefined) team.description = input.description;
+  if (input.settings !== undefined) {
+    team.settings = { ...team.settings, ...input.settings };
+  }
+  team.updated_at = new Date().toISOString();
+
+  teams[teamIndex] = team;
+
+  // Save updated registry
+  await writeFile(teamsPath, JSON.stringify({ teams }, null, 2), "utf-8");
+
+  return team;
+}
+
+/**
+ * Delete a team
+ */
+export async function deleteTeam(teamId: string): Promise<boolean> {
+  const repoRoot = await getRepoRoot();
+  const teamsPath = path.join(repoRoot, TEAMS_REGISTRY_RELATIVE_PATH);
+
+  const teams = await listTeams();
+  const filteredTeams = teams.filter((t) => t.id !== teamId);
+
+  if (filteredTeams.length === teams.length) {
+    return false; // Team not found
+  }
+
+  // Save updated registry
+  await writeFile(
+    teamsPath,
+    JSON.stringify({ teams: filteredTeams }, null, 2),
+    "utf-8",
+  );
+
+  return true;
+}
+
+/**
+ * Add a member to a team
+ */
+export async function addTeamMember(
+  teamId: string,
+  input: AddTeamMemberInput,
+): Promise<Team> {
+  const repoRoot = await getRepoRoot();
+  const teamsPath = path.join(repoRoot, TEAMS_REGISTRY_RELATIVE_PATH);
+
+  const teams = await listTeams();
+  const teamIndex = teams.findIndex((t) => t.id === teamId);
+
+  if (teamIndex === -1) {
+    throw new Error(`Team not found: ${teamId}`);
+  }
+
+  const team = teams[teamIndex];
+
+  // Check if member already exists
+  const existingMemberIndex = team.members.findIndex(
+    (m) => m.user_id === input.user_id,
+  );
+
+  const newMember: TeamMember = {
+    user_id: input.user_id,
+    email: input.email,
+    name: input.name,
+    role: input.role,
+    joined_at: new Date().toISOString(),
+  };
+
+  if (existingMemberIndex !== -1) {
+    // Update existing member
+    team.members[existingMemberIndex] = newMember;
+  } else {
+    // Add new member
+    team.members.push(newMember);
+  }
+
+  team.updated_at = new Date().toISOString();
+  teams[teamIndex] = team;
+
+  // Save updated registry
+  await writeFile(teamsPath, JSON.stringify({ teams }, null, 2), "utf-8");
+
+  return team;
+}
+
+/**
+ * Remove a member from a team
+ */
+export async function removeTeamMember(
+  teamId: string,
+  userId: string,
+): Promise<Team> {
+  const repoRoot = await getRepoRoot();
+  const teamsPath = path.join(repoRoot, TEAMS_REGISTRY_RELATIVE_PATH);
+
+  const teams = await listTeams();
+  const teamIndex = teams.findIndex((t) => t.id === teamId);
+
+  if (teamIndex === -1) {
+    throw new Error(`Team not found: ${teamId}`);
+  }
+
+  const team = teams[teamIndex];
+  team.members = team.members.filter((m) => m.user_id !== userId);
+  team.updated_at = new Date().toISOString();
+  teams[teamIndex] = team;
+
+  // Save updated registry
+  await writeFile(teamsPath, JSON.stringify({ teams }, null, 2), "utf-8");
+
+  return team;
+}
+
+/**
+ * Calculate organization-level metrics across all teams
+ */
+export async function calculateOrgLevelMetrics(): Promise<OrgLevelMetrics> {
+  const teams = await listTeams();
+  const historySnapshots = await listHistorySnapshots();
+
+  const teamsSummary = [];
+  let totalFindings = 0;
+  let totalHealthScore = 0;
+  let healthScoreCount = 0;
+  const allPipelinePaths = new Set<string>();
+
+  for (const team of teams) {
+    const teamPipelines = team.settings.pipeline_paths || [];
+
+    // Get metrics for this team's pipelines
+    const teamMetrics = {
+      team_id: team.id,
+      team_name: team.name,
+      pipeline_count: teamPipelines.length,
+      avg_duration_secs: 0,
+      total_findings: 0,
+      health_score: 0,
+      monthly_cost: 0,
+    };
+
+    // Calculate metrics from history snapshots for this team's pipelines
+    const teamSnapshots = historySnapshots.filter((snapshot) =>
+      teamPipelines.some((pipeline) =>
+        snapshot.workflow_identifier.includes(pipeline),
+      ),
+    );
+
+    if (teamSnapshots.length > 0) {
+      const totalDuration = teamSnapshots.reduce(
+        (sum, s) => sum + s.avg_duration_sec,
+        0,
+      );
+      teamMetrics.avg_duration_secs = totalDuration / teamSnapshots.length;
+
+      const runsPerMonth = team.settings.default_runs_per_month || 500;
+      const developerRate = team.settings.default_developer_rate || 150;
+
+      // Estimate monthly cost (simplified calculation)
+      const computeCostPerRun = (teamMetrics.avg_duration_secs / 60) * 0.008; // $0.008 per minute
+      teamMetrics.monthly_cost = computeCostPerRun * runsPerMonth;
+    }
+
+    // Add to totals
+    teamPipelines.forEach((p) => allPipelinePaths.add(p));
+    teamsSummary.push(teamMetrics);
+  }
+
+  // Calculate aggregates
+  const totalMonthlyCost = teamsSummary.reduce((sum, t) => sum + t.monthly_cost, 0);
+  const avgHealthScore = healthScoreCount > 0 ? totalHealthScore / healthScoreCount : 0;
+
+  return {
+    total_teams: teams.length,
+    total_pipelines: allPipelinePaths.size,
+    total_findings: totalFindings,
+    avg_health_score: avgHealthScore,
+    total_monthly_cost: totalMonthlyCost,
+    total_time_saved_per_month: 0, // Would need optimization data
+    teams_summary: teamsSummary,
+  };
 }
