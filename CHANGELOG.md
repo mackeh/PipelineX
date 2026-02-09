@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Runner right-sizing recommendation engine based on inferred per-job resource profiling.
 - New `pipelinex right-size` CLI command with `text` and `json` output formats.
+- Dashboard API endpoint `POST /api/gitlab/webhook` for GitLab pipeline webhook ingestion.
+- Webhook cache panel now explicitly supports both GitHub and GitLab event-driven refreshes.
 
 ### Changed
 - `analyze` now emits runner right-sizing findings in optimization reports.

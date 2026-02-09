@@ -4,6 +4,7 @@ The dashboard now supports:
 
 - Live pipeline analysis from real `pipelinex` CLI output
 - GitHub webhook ingestion for workflow history refresh
+- GitLab webhook ingestion for pipeline history refresh
 - Anonymized community benchmark submissions and cohort comparisons
 
 ## Run locally
@@ -47,6 +48,13 @@ Accepts GitHub webhook payloads and refreshes history cache when:
 
 - `x-github-event = workflow_run`
 - `action = completed`
+
+### `POST /api/gitlab/webhook`
+
+Accepts GitLab webhook payloads and refreshes history cache when:
+
+- `object_kind = pipeline`
+- `object_attributes.status` is a completed pipeline state (`success`, `failed`, `canceled`, `skipped`, `manual`)
 
 ### `GET /api/history`
 
@@ -164,6 +172,8 @@ Custom integration scopes:
 
 - `GITHUB_TOKEN`: used for history refresh calls.
 - `GITHUB_WEBHOOK_SECRET`: enables webhook signature validation.
+- `GITLAB_WEBHOOK_TOKEN` or `GITLAB_WEBHOOK_SECRET_TOKEN`: optional shared token validation for GitLab webhooks.
+- `PIPELINEX_GITLAB_WORKFLOW_PATH`: optional workflow identifier stored for GitLab snapshots (default `.gitlab-ci.yml`).
 - `PIPELINEX_HISTORY_RUNS`: optional lookback window for webhook-triggered refreshes (default `100`).
 - `PIPELINEX_API_KEY`: single-key public API mode.
 - `PIPELINEX_API_KEY_ROLES`: CSV roles for the single-key public API mode.
