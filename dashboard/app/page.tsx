@@ -34,7 +34,10 @@ import type {
   BenchmarkStats,
   Finding,
   HistorySnapshot,
+  WeeklyDigestDeliveryResult,
+  WeeklyDigestSummary,
 } from "@/lib/pipelinex";
+import { DagExplorer } from "@/components/DagExplorer";
 
 type WorkflowsResponse = {
   files?: string[];
@@ -72,6 +75,12 @@ type AlertEvaluateResponse = {
   error?: string;
 };
 
+type WeeklyDigestResponse = {
+  summary?: WeeklyDigestSummary;
+  delivery?: WeeklyDigestDeliveryResult;
+  error?: string;
+};
+
 function formatDuration(seconds: number): string {
   const safeSeconds = Math.max(0, Math.round(seconds));
   const minutes = Math.floor(safeSeconds / 60);
@@ -81,6 +90,10 @@ function formatDuration(seconds: number): string {
 
 function percentage(value: number): string {
   return `${value.toFixed(1)}%`;
+}
+
+function formatUsd(value: number): string {
+  return `$${value.toFixed(2)}`;
 }
 
 function severityColor(severity: string): string {
@@ -109,6 +122,10 @@ export default function DashboardPage() {
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
   const [alertSummary, setAlertSummary] = useState<AlertEvaluationSummary | null>(null);
+  const [digestLoading, setDigestLoading] = useState(false);
+  const [digestSummary, setDigestSummary] = useState<WeeklyDigestSummary | null>(null);
+  const [digestDelivery, setDigestDelivery] = useState<WeeklyDigestDeliveryResult | null>(null);
+  const [digestError, setDigestError] = useState<string | null>(null);
   const [benchmarkStats, setBenchmarkStats] = useState<BenchmarkStats | null>(null);
   const [benchmarkSubmitting, setBenchmarkSubmitting] = useState(false);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
@@ -219,7 +236,7 @@ export default function DashboardPage() {
       if (!response.ok || !payload.snapshots) {
         throw new Error(payload.error || "Failed to load history snapshots.");
       }
-      setHistorySnapshots(payload.snapshots.slice(0, 6));
+      setHistorySnapshots(payload.snapshots.slice(0, 20));
     } catch (historyError) {
       setError(
         historyError instanceof Error
@@ -259,6 +276,36 @@ export default function DashboardPage() {
       );
     } finally {
       setLoadingAlerts(false);
+    }
+  }, []);
+
+  const loadDigest = useCallback(async (deliver: boolean) => {
+    setDigestLoading(true);
+    setDigestError(null);
+    try {
+      const response = await fetch("/api/digest/weekly", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          deliver,
+          channels: { dryRun: !deliver },
+        }),
+      });
+      const payload = (await response.json()) as WeeklyDigestResponse;
+      if (!response.ok || !payload.summary) {
+        throw new Error(payload.error || "Failed to generate weekly digest.");
+      }
+
+      setDigestSummary(payload.summary);
+      setDigestDelivery(payload.delivery ?? null);
+    } catch (digestLoadError) {
+      setDigestError(
+        digestLoadError instanceof Error
+          ? digestLoadError.message
+          : "Failed to generate weekly digest.",
+      );
+    } finally {
+      setDigestLoading(false);
     }
   }, []);
 
@@ -303,11 +350,12 @@ export default function DashboardPage() {
     void loadWorkflows();
     void loadHistorySnapshots();
     void loadAlerts();
+    void loadDigest(false);
 
     return () => {
       mounted = false;
     };
-  }, [loadAlerts, loadHistorySnapshots, runAnalysis]);
+  }, [loadAlerts, loadDigest, loadHistorySnapshots, runAnalysis]);
 
   const severityCounts = useMemo(() => {
     const counts = {
@@ -390,6 +438,45 @@ export default function DashboardPage() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
   }, [report]);
+
+  const trendSeries = useMemo(() => {
+    if (historySnapshots.length === 0) {
+      return [] as Array<{
+        label: string;
+        durationSec: number;
+        failureRatePct: number;
+        costUsdPerRun: number;
+      }>;
+    }
+
+    const developerHourlyRate = 150;
+    return [...historySnapshots]
+      .sort(
+        (left, right) =>
+          new Date(left.refreshed_at).getTime() - new Date(right.refreshed_at).getTime(),
+      )
+      .slice(-12)
+      .map((snapshot) => {
+        const refreshed = new Date(snapshot.refreshed_at);
+        const label = `${refreshed.toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+        })} ${refreshed.toLocaleTimeString(undefined, {
+          hour: "2-digit",
+          minute: "2-digit",
+        })}`;
+        const durationSec = snapshot.stats.avg_duration_sec;
+        const failureRatePct = Math.max(0, (1 - snapshot.stats.success_rate) * 100);
+        const costUsdPerRun = (durationSec / 3600) * developerHourlyRate;
+
+        return {
+          label,
+          durationSec: Number(durationSec.toFixed(2)),
+          failureRatePct: Number(failureRatePct.toFixed(2)),
+          costUsdPerRun: Number(costUsdPerRun.toFixed(2)),
+        };
+      });
+  }, [historySnapshots]);
 
   const savingsSeconds = report
     ? Math.max(0, report.total_estimated_duration_secs - report.optimized_duration_secs)
@@ -551,6 +638,122 @@ export default function DashboardPage() {
                       <Bar dataKey="count" fill="#f97316" radius={[6, 6, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
+                </Panel>
+              </section>
+
+              <section className="mt-5">
+                <Panel title="Pipeline Explorer: Interactive DAG (D3)">
+                  <DagExplorer report={report} />
+                </Panel>
+              </section>
+
+              <section className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-3">
+                <Panel title="Trend: Duration">
+                  {trendSeries.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <AreaChart data={trendSeries} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="trendDurationFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.05} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid stroke="#3f3f46" strokeDasharray="3 3" />
+                        <XAxis dataKey="label" stroke="#a1a1aa" hide />
+                        <YAxis stroke="#a1a1aa" />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "#09090b", border: "1px solid #3f3f46" }}
+                          labelStyle={{ color: "#e4e4e7" }}
+                          formatter={(value: number | string | undefined) =>
+                            formatDuration(Number(value ?? 0))
+                          }
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="durationSec"
+                          stroke="#22d3ee"
+                          strokeWidth={2}
+                          fill="url(#trendDurationFill)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-sm text-zinc-400">
+                      Trend data appears after history snapshots are collected by webhooks or manual refresh.
+                    </p>
+                  )}
+                </Panel>
+
+                <Panel title="Trend: Failure Rate">
+                  {trendSeries.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <AreaChart data={trendSeries} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="trendFailureFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="#f97316" stopOpacity={0.05} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid stroke="#3f3f46" strokeDasharray="3 3" />
+                        <XAxis dataKey="label" stroke="#a1a1aa" hide />
+                        <YAxis stroke="#a1a1aa" />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "#09090b", border: "1px solid #3f3f46" }}
+                          labelStyle={{ color: "#e4e4e7" }}
+                          formatter={(value: number | string | undefined) =>
+                            percentage(Number(value ?? 0))
+                          }
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="failureRatePct"
+                          stroke="#f97316"
+                          strokeWidth={2}
+                          fill="url(#trendFailureFill)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-sm text-zinc-400">
+                      Failure-rate trend will render once snapshot history is available.
+                    </p>
+                  )}
+                </Panel>
+
+                <Panel title="Trend: Cost / Run">
+                  {trendSeries.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={220}>
+                      <AreaChart data={trendSeries} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="trendCostFill" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.35} />
+                            <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.05} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid stroke="#3f3f46" strokeDasharray="3 3" />
+                        <XAxis dataKey="label" stroke="#a1a1aa" hide />
+                        <YAxis stroke="#a1a1aa" />
+                        <Tooltip
+                          contentStyle={{ backgroundColor: "#09090b", border: "1px solid #3f3f46" }}
+                          labelStyle={{ color: "#e4e4e7" }}
+                          formatter={(value: number | string | undefined) =>
+                            formatUsd(Number(value ?? 0))
+                          }
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="costUsdPerRun"
+                          stroke="#a78bfa"
+                          strokeWidth={2}
+                          fill="url(#trendCostFill)"
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-sm text-zinc-400">
+                      Cost trend is computed from average duration and default labor-rate assumptions.
+                    </p>
+                  )}
                 </Panel>
               </section>
 
@@ -848,6 +1051,119 @@ export default function DashboardPage() {
                       {alertRules.length === 0
                         ? "No alert rules configured yet. Use POST /api/alerts to add threshold rules."
                         : "No threshold breaches detected in current snapshot cache."}
+                    </p>
+                  )}
+                </Panel>
+              </section>
+
+              <section className="mt-5">
+                <Panel title="Weekly Digest Reports (Slack / Teams / Email)">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm text-zinc-400">
+                      Generate a weekly summary from cached snapshots and optionally deliver using configured channels.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void loadDigest(false)}
+                        disabled={digestLoading}
+                        className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:border-cyan-400 hover:text-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-3.5 w-3.5 ${digestLoading ? "animate-spin" : ""}`} />
+                        Refresh
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void loadDigest(true)}
+                        disabled={digestLoading}
+                        className="inline-flex items-center gap-2 rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Deliver
+                      </button>
+                    </div>
+                  </div>
+
+                  {digestError && (
+                    <p className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+                      {digestError}
+                    </p>
+                  )}
+
+                  {digestSummary ? (
+                    <>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+                        <BenchmarkTile
+                          label="Snapshots"
+                          value={String(digestSummary.snapshot_count)}
+                          sublabel={`Window ${digestSummary.window_days} day(s)`}
+                          icon={Workflow}
+                        />
+                        <BenchmarkTile
+                          label="Total Runs"
+                          value={String(digestSummary.total_runs)}
+                          sublabel={`Avg ${formatDuration(digestSummary.avg_duration_sec)}`}
+                          icon={Clock3}
+                        />
+                        <BenchmarkTile
+                          label="Failure Rate"
+                          value={percentage(digestSummary.failure_rate_pct)}
+                          sublabel="weighted across snapshots"
+                          icon={AlertTriangle}
+                        />
+                        <BenchmarkTile
+                          label="Monthly Cost"
+                          value={formatUsd(digestSummary.estimated_monthly_opportunity_cost_usd)}
+                          sublabel="estimated opportunity cost"
+                          icon={Gauge}
+                        />
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-1 gap-4 xl:grid-cols-2">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">Action Items</p>
+                          <ul className="mt-2 space-y-2">
+                            {digestSummary.action_items.map((item) => (
+                              <li key={item} className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-300">
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">Top Slow Pipelines</p>
+                          <ul className="mt-2 space-y-2">
+                            {digestSummary.top_slowest_pipelines.slice(0, 4).map((pipeline) => (
+                              <li
+                                key={`${pipeline.repo}-${pipeline.workflow}-${pipeline.refreshed_at}`}
+                                className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-300"
+                              >
+                                <p className="font-semibold text-zinc-100">{pipeline.repo}</p>
+                                <p className="text-xs text-zinc-400">{pipeline.workflow}</p>
+                                <p className="mt-1 text-xs text-zinc-300">
+                                  {formatDuration(pipeline.avg_duration_sec)} avg • {percentage(pipeline.failure_rate_pct)} failure
+                                </p>
+                              </li>
+                            ))}
+                            {digestSummary.top_slowest_pipelines.length === 0 && (
+                              <li className="rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-400">
+                                No snapshot data in the selected digest window.
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+
+                      {digestDelivery && (
+                        <p className="mt-3 text-xs text-zinc-300">
+                          Delivery status: Slack {digestDelivery.slack_sent ? "sent" : "not sent"} • Teams{" "}
+                          {digestDelivery.teams_sent ? "sent" : "not sent"} • Email queued {digestDelivery.email_queued}
+                          {digestDelivery.email_outbox_path ? ` • Outbox ${digestDelivery.email_outbox_path}` : ""}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-zinc-400">
+                      No weekly digest has been generated yet.
                     </p>
                   )}
                 </Panel>

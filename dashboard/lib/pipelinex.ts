@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { access, appendFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
@@ -200,12 +200,55 @@ export interface AlertEvaluationSummary {
   triggers: AlertTrigger[];
 }
 
+export interface WeeklyDigestPipelineSummary {
+  repo: string;
+  workflow: string;
+  provider: string;
+  refreshed_at: string;
+  runs: number;
+  avg_duration_sec: number;
+  failure_rate_pct: number;
+  estimated_monthly_opportunity_cost_usd: number;
+  flaky_jobs: string[];
+}
+
+export interface WeeklyDigestSummary {
+  generated_at: string;
+  window_days: number;
+  snapshot_count: number;
+  total_runs: number;
+  avg_duration_sec: number;
+  failure_rate_pct: number;
+  estimated_monthly_opportunity_cost_usd: number;
+  top_flaky_jobs: Array<{ job: string; count: number }>;
+  top_slowest_pipelines: WeeklyDigestPipelineSummary[];
+  action_items: string[];
+}
+
+export interface WeeklyDigestDeliveryOptions {
+  slackWebhookUrl?: string;
+  teamsWebhookUrl?: string;
+  emailRecipients?: string[];
+  emailOutboxPath?: string;
+  dryRun?: boolean;
+}
+
+export interface WeeklyDigestDeliveryResult {
+  dry_run: boolean;
+  slack_sent: boolean;
+  teams_sent: boolean;
+  email_queued: number;
+  email_outbox_path?: string;
+  errors: string[];
+}
+
 const PIPELINE_EXTENSIONS = [".yml", ".yaml", ".groovy", ".jenkinsfile"];
 const SEARCH_ROOTS = [".github/workflows", "tests/fixtures"];
 const HISTORY_CACHE_RELATIVE_DIR = ".pipelinex/history-cache";
 const BENCHMARK_REGISTRY_RELATIVE_PATH = ".pipelinex/benchmark-registry.json";
 const IMPACT_REGISTRY_RELATIVE_PATH = ".pipelinex/optimization-impact-registry.json";
 const ALERT_RULES_RELATIVE_PATH = ".pipelinex/alert-rules.json";
+const DIGEST_EMAIL_OUTBOX_RELATIVE_PATH = ".pipelinex/digest-email-outbox.jsonl";
 
 function pathExists(filePath: string): Promise<boolean> {
   return access(filePath, constants.F_OK)
@@ -1378,4 +1421,374 @@ export async function evaluateAlertRules(
     triggered_count: triggers.length,
     triggers,
   };
+}
+
+interface WeeklyDigestOptions {
+  windowDays?: number;
+  runsPerMonth?: number;
+  developerHourlyRate?: number;
+}
+
+function resolveWeeklyDigestDefaults(
+  options: WeeklyDigestOptions = {},
+): { windowDays: number; runsPerMonth: number; developerHourlyRate: number } {
+  const windowDaysFromEnv = Number.parseInt(
+    process.env.PIPELINEX_DIGEST_WINDOW_DAYS?.trim() || "",
+    10,
+  );
+  const alertDefaults = resolveAlertDefaults(
+    options.runsPerMonth,
+    options.developerHourlyRate,
+  );
+
+  const normalizedWindow =
+    typeof options.windowDays === "number" &&
+    Number.isFinite(options.windowDays) &&
+    options.windowDays > 0
+      ? Math.floor(options.windowDays)
+      : Number.isFinite(windowDaysFromEnv) && windowDaysFromEnv > 0
+        ? windowDaysFromEnv
+        : 7;
+
+  return {
+    windowDays: normalizedWindow,
+    runsPerMonth: alertDefaults.runsPerMonth,
+    developerHourlyRate: alertDefaults.developerHourlyRate,
+  };
+}
+
+function csvValues(raw: string | undefined): string[] {
+  if (!raw) {
+    return [];
+  }
+  return raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+function digestEmailOutboxPath(repoRoot: string): string {
+  return path.join(repoRoot, DIGEST_EMAIL_OUTBOX_RELATIVE_PATH);
+}
+
+function roundTo(value: number, digits: number): number {
+  const multiplier = 10 ** digits;
+  return Math.round(value * multiplier) / multiplier;
+}
+
+function estimateMonthlyOpportunityCost(
+  avgDurationSec: number,
+  runsPerMonth: number,
+  developerHourlyRate: number,
+): number {
+  const monthlyHoursLost = (avgDurationSec * runsPerMonth) / 3600;
+  return monthlyHoursLost * developerHourlyRate;
+}
+
+function digestActionItems(summary: WeeklyDigestSummary): string[] {
+  if (summary.snapshot_count === 0) {
+    return [
+      "No snapshots were captured in the selected window. Configure GitHub/GitLab webhooks or run history refresh jobs.",
+    ];
+  }
+
+  const actions: string[] = [];
+  if (summary.failure_rate_pct >= 10) {
+    actions.push(
+      "Failure rate is elevated. Prioritize flaky test triage and investigate repeated failing jobs.",
+    );
+  }
+  if (summary.avg_duration_sec >= 20 * 60) {
+    actions.push(
+      "Average pipeline duration exceeds 20 minutes. Focus on critical path parallelization and cache coverage.",
+    );
+  }
+  if (summary.top_flaky_jobs.length > 0) {
+    actions.push(
+      `Top flaky job this week: ${summary.top_flaky_jobs[0].job}. Consider quarantine/ownership assignment.`,
+    );
+  }
+  if (summary.estimated_monthly_opportunity_cost_usd >= 1000) {
+    actions.push(
+      "Estimated opportunity cost is high. Schedule optimization sprint and alert thresholds for regressions.",
+    );
+  }
+
+  if (actions.length === 0) {
+    actions.push(
+      "Pipeline health is stable this week. Continue monitoring trend and benchmark drift for regressions.",
+    );
+  }
+
+  return actions.slice(0, 5);
+}
+
+function digestMarkdown(summary: WeeklyDigestSummary): string {
+  const lines: string[] = [];
+  lines.push("PipelineX Weekly Digest");
+  lines.push(
+    `Window: last ${summary.window_days} day(s) | Snapshots: ${summary.snapshot_count} | Total runs: ${summary.total_runs}`,
+  );
+  lines.push(
+    `Avg duration: ${roundTo(summary.avg_duration_sec / 60, 2)} min | Failure rate: ${roundTo(summary.failure_rate_pct, 2)}%`,
+  );
+  lines.push(
+    `Estimated monthly opportunity cost: $${roundTo(
+      summary.estimated_monthly_opportunity_cost_usd,
+      2,
+    )}`,
+  );
+
+  if (summary.top_slowest_pipelines.length > 0) {
+    lines.push("");
+    lines.push("Top slow pipelines:");
+    for (const pipeline of summary.top_slowest_pipelines.slice(0, 3)) {
+      lines.push(
+        `- ${pipeline.repo} :: ${pipeline.workflow} (${roundTo(
+          pipeline.avg_duration_sec / 60,
+          2,
+        )} min avg, ${roundTo(pipeline.failure_rate_pct, 2)}% fail)`,
+      );
+    }
+  }
+
+  if (summary.top_flaky_jobs.length > 0) {
+    lines.push("");
+    lines.push("Top flaky jobs:");
+    for (const flaky of summary.top_flaky_jobs.slice(0, 5)) {
+      lines.push(`- ${flaky.job}: ${flaky.count} workflow(s) flagged`);
+    }
+  }
+
+  if (summary.action_items.length > 0) {
+    lines.push("");
+    lines.push("Action items:");
+    for (const action of summary.action_items) {
+      lines.push(`- ${action}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+export async function generateWeeklyDigest(
+  options: WeeklyDigestOptions = {},
+): Promise<WeeklyDigestSummary> {
+  const defaults = resolveWeeklyDigestDefaults(options);
+  const snapshots = await listHistorySnapshots();
+  const cutoffMs = Date.now() - defaults.windowDays * 24 * 60 * 60 * 1000;
+  const scoped = snapshots.filter((snapshot) => {
+    const refreshedMs = new Date(snapshot.refreshed_at).getTime();
+    return Number.isFinite(refreshedMs) && refreshedMs >= cutoffMs;
+  });
+
+  const totalRuns = scoped.reduce(
+    (acc, snapshot) => acc + Math.max(snapshot.stats.total_runs, 1),
+    0,
+  );
+  const weightedDuration = scoped.reduce((acc, snapshot) => {
+    const runs = Math.max(snapshot.stats.total_runs, 1);
+    return acc + snapshot.stats.avg_duration_sec * runs;
+  }, 0);
+  const weightedSuccessRate = scoped.reduce((acc, snapshot) => {
+    const runs = Math.max(snapshot.stats.total_runs, 1);
+    return acc + snapshot.stats.success_rate * runs;
+  }, 0);
+
+  const avgDurationSec = totalRuns > 0 ? weightedDuration / totalRuns : 0;
+  const successRate = totalRuns > 0 ? weightedSuccessRate / totalRuns : 0;
+  const failureRatePct = Math.max(0, (1 - successRate) * 100);
+  const monthlyOpportunityCost = estimateMonthlyOpportunityCost(
+    avgDurationSec,
+    defaults.runsPerMonth,
+    defaults.developerHourlyRate,
+  );
+
+  const flakyCounts = new Map<string, number>();
+  for (const snapshot of scoped) {
+    for (const job of snapshot.stats.flaky_jobs) {
+      const key = job.trim();
+      if (!key) {
+        continue;
+      }
+      flakyCounts.set(key, (flakyCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  const topFlakyJobs = Array.from(flakyCounts.entries())
+    .map(([job, count]) => ({ job, count }))
+    .sort((left, right) => right.count - left.count || left.job.localeCompare(right.job))
+    .slice(0, 8);
+
+  const topSlowestPipelines: WeeklyDigestPipelineSummary[] = scoped
+    .map((snapshot) => {
+      const provider = inferProviderFromSnapshot(snapshot);
+      const failureRate = Math.max(0, (1 - snapshot.stats.success_rate) * 100);
+      return {
+        repo: snapshot.repo,
+        workflow: snapshot.workflow,
+        provider,
+        refreshed_at: snapshot.refreshed_at,
+        runs: snapshot.stats.total_runs,
+        avg_duration_sec: snapshot.stats.avg_duration_sec,
+        failure_rate_pct: failureRate,
+        estimated_monthly_opportunity_cost_usd: estimateMonthlyOpportunityCost(
+          snapshot.stats.avg_duration_sec,
+          defaults.runsPerMonth,
+          defaults.developerHourlyRate,
+        ),
+        flaky_jobs: snapshot.stats.flaky_jobs,
+      };
+    })
+    .sort((left, right) => right.avg_duration_sec - left.avg_duration_sec)
+    .slice(0, 5);
+
+  const summary: WeeklyDigestSummary = {
+    generated_at: new Date().toISOString(),
+    window_days: defaults.windowDays,
+    snapshot_count: scoped.length,
+    total_runs: totalRuns,
+    avg_duration_sec: roundTo(avgDurationSec, 2),
+    failure_rate_pct: roundTo(failureRatePct, 2),
+    estimated_monthly_opportunity_cost_usd: roundTo(monthlyOpportunityCost, 2),
+    top_flaky_jobs: topFlakyJobs,
+    top_slowest_pipelines: topSlowestPipelines,
+    action_items: [],
+  };
+
+  summary.action_items = digestActionItems(summary);
+  return summary;
+}
+
+async function sendSlackDigest(webhookUrl: string, summary: WeeklyDigestSummary): Promise<void> {
+  const response = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text: "```" + digestMarkdown(summary) + "```",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Slack webhook request failed with status ${response.status}.`);
+  }
+}
+
+async function sendTeamsDigest(webhookUrl: string, summary: WeeklyDigestSummary): Promise<void> {
+  const response = await fetch(webhookUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      "@type": "MessageCard",
+      "@context": "https://schema.org/extensions",
+      summary: "PipelineX Weekly Digest",
+      themeColor: "00BCD4",
+      title: "PipelineX Weekly Digest",
+      text: digestMarkdown(summary).replace(/\n/g, "<br/>"),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Teams webhook request failed with status ${response.status}.`);
+  }
+}
+
+async function queueDigestEmails(
+  recipients: string[],
+  summary: WeeklyDigestSummary,
+  explicitOutboxPath?: string,
+): Promise<{ queued: number; outboxPath: string }> {
+  if (recipients.length === 0) {
+    return { queued: 0, outboxPath: "" };
+  }
+
+  const repoRoot = await getRepoRoot();
+  const outboxPath = explicitOutboxPath?.trim()
+    ? path.resolve(repoRoot, explicitOutboxPath.trim())
+    : digestEmailOutboxPath(repoRoot);
+
+  await mkdir(path.dirname(outboxPath), { recursive: true });
+
+  const now = new Date().toISOString();
+  let queued = 0;
+  for (const recipient of recipients) {
+    const entry = {
+      queued_at: now,
+      to: recipient,
+      subject: `PipelineX Weekly Digest - ${summary.generated_at.slice(0, 10)}`,
+      body_text: digestMarkdown(summary),
+      summary,
+    };
+    await appendFile(outboxPath, `${JSON.stringify(entry)}\n`, "utf8");
+    queued += 1;
+  }
+
+  return { queued, outboxPath };
+}
+
+export async function deliverWeeklyDigest(
+  summary: WeeklyDigestSummary,
+  options: WeeklyDigestDeliveryOptions = {},
+): Promise<WeeklyDigestDeliveryResult> {
+  const dryRun = options.dryRun ?? false;
+  const slackWebhookUrl =
+    options.slackWebhookUrl?.trim() || process.env.PIPELINEX_DIGEST_SLACK_WEBHOOK_URL?.trim();
+  const teamsWebhookUrl =
+    options.teamsWebhookUrl?.trim() || process.env.PIPELINEX_DIGEST_TEAMS_WEBHOOK_URL?.trim();
+  const emailRecipients =
+    options.emailRecipients && options.emailRecipients.length > 0
+      ? options.emailRecipients
+      : csvValues(process.env.PIPELINEX_DIGEST_EMAIL_TO);
+
+  const result: WeeklyDigestDeliveryResult = {
+    dry_run: dryRun,
+    slack_sent: false,
+    teams_sent: false,
+    email_queued: 0,
+    errors: [],
+  };
+
+  if (!dryRun && slackWebhookUrl) {
+    try {
+      await sendSlackDigest(slackWebhookUrl, summary);
+      result.slack_sent = true;
+    } catch (error) {
+      result.errors.push(
+        error instanceof Error ? error.message : "Slack digest delivery failed.",
+      );
+    }
+  }
+
+  if (!dryRun && teamsWebhookUrl) {
+    try {
+      await sendTeamsDigest(teamsWebhookUrl, summary);
+      result.teams_sent = true;
+    } catch (error) {
+      result.errors.push(
+        error instanceof Error ? error.message : "Teams digest delivery failed.",
+      );
+    }
+  }
+
+  if (emailRecipients.length > 0) {
+    try {
+      if (dryRun) {
+        result.email_queued = emailRecipients.length;
+      } else {
+        const queued = await queueDigestEmails(
+          emailRecipients,
+          summary,
+          options.emailOutboxPath,
+        );
+        result.email_queued = queued.queued;
+        result.email_outbox_path = queued.outboxPath;
+      }
+    } catch (error) {
+      result.errors.push(
+        error instanceof Error ? error.message : "Email digest queueing failed.",
+      );
+    }
+  }
+
+  return result;
 }
