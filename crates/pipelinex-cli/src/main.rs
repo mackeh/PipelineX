@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use pipelinex_core::analyzer;
 use pipelinex_core::flaky_detector::FlakyDetector;
+use pipelinex_core::github_actions_to_gitlab_ci;
 use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::parser::aws_codepipeline::AwsCodePipelineParser;
 use pipelinex_core::parser::azure::AzurePipelinesParser;
@@ -189,6 +190,24 @@ enum Commands {
         format: String,
     },
 
+    /// Migrate workflow config between CI providers (GitHub Actions -> GitLab CI)
+    Migrate {
+        /// Path to source workflow file
+        path: PathBuf,
+
+        /// Target provider (currently: gitlab-ci)
+        #[arg(long, default_value = "gitlab-ci")]
+        to: String,
+
+        /// Output file path for migrated config
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Output format (text, json, yaml)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+
     /// External plugin management (scaffold and inspection)
     Plugins {
         #[command(subcommand)]
@@ -266,6 +285,12 @@ async fn main() -> Result<()> {
             token,
             format,
         } => cmd_history(&repo, &workflow, runs, token, &format).await,
+        Commands::Migrate {
+            path,
+            to,
+            output,
+            format,
+        } => cmd_migrate(&path, &to, output.as_deref(), &format),
         Commands::Plugins { command } => cmd_plugins(command),
     }
 }
@@ -688,6 +713,69 @@ async fn cmd_history(
         }
         _ => {
             display::print_history_stats(&stats);
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_migrate(
+    path: &Path,
+    target_provider: &str,
+    output: Option<&std::path::Path>,
+    format: &str,
+) -> Result<()> {
+    if !path.is_file() {
+        anyhow::bail!("'{}' is not a file.", path.display());
+    }
+
+    let dag = parse_pipeline(path)?;
+    let migration = match target_provider {
+        "gitlab" | "gitlab-ci" => github_actions_to_gitlab_ci(&dag)?,
+        other => anyhow::bail!(
+            "Unsupported migration target '{}'. Supported targets: gitlab-ci",
+            other
+        ),
+    };
+
+    if let Some(out_path) = output {
+        std::fs::write(out_path, &migration.yaml)?;
+    }
+
+    match format {
+        "json" => {
+            println!("{}", serde_json::to_string_pretty(&migration)?);
+        }
+        "yaml" => {
+            if output.is_none() {
+                print!("{}", migration.yaml);
+            } else if let Some(out_path) = output {
+                println!("Migrated config written to {}", out_path.display());
+            }
+        }
+        _ => {
+            println!("Migration completed:");
+            println!("  Source: {}", migration.source_provider);
+            println!("  Target: {}", migration.target_provider);
+            println!("  Jobs converted: {}", migration.converted_jobs);
+            if migration.warnings.is_empty() {
+                println!("  Warnings: none");
+            } else {
+                println!("  Warnings: {}", migration.warnings.len());
+                for warning in &migration.warnings {
+                    println!("  - {}", warning);
+                }
+            }
+
+            match output {
+                Some(out_path) => {
+                    println!("Migrated config written to {}", out_path.display());
+                }
+                None => {
+                    println!();
+                    print!("{}", migration.yaml);
+                }
+            }
         }
     }
 
