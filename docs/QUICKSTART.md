@@ -452,6 +452,7 @@ ls .github/workflows/*.yml | xargs -P 4 -I {} pipelinex analyze {}
 | `pipelinex cost <directory>` | Calculate cost savings |
 | `pipelinex simulate <file>` | Run Monte Carlo simulation |
 | `pipelinex graph <file>` | Visualize pipeline DAG |
+| `pipelinex migrate <file> --to gitlab-ci` | Convert GitHub Actions workflow to GitLab CI |
 | `pipelinex --help` | Show all commands |
 
 ---
