@@ -790,7 +790,7 @@ pipelinex/
 - [x] Slack/Teams/email weekly digest reports
 - [x] Alert system (threshold-based: duration, failure rate, cost)
 - [x] Bitbucket Pipelines + CircleCI parser support
-- [ ] "Apply optimization" one-click PR creation
+- [x] "Apply optimization" one-click PR creation
 - [ ] Team management, org-level views
 
 ### Phase 4 — Ecosystem (Weeks 21–28)
