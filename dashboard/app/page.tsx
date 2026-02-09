@@ -32,6 +32,8 @@ import type {
   AnalysisReport,
   BenchmarkEntry,
   BenchmarkStats,
+  FlakyJobEntry,
+  FlakyManagementSummary,
   Finding,
   HistorySnapshot,
   WeeklyDigestDeliveryResult,
@@ -81,6 +83,11 @@ type WeeklyDigestResponse = {
   error?: string;
 };
 
+type FlakyResponse = {
+  summary?: FlakyManagementSummary;
+  error?: string;
+};
+
 function formatDuration(seconds: number): string {
   const safeSeconds = Math.max(0, Math.round(seconds));
   const minutes = Math.floor(safeSeconds / 60);
@@ -122,6 +129,10 @@ export default function DashboardPage() {
   const [loadingAlerts, setLoadingAlerts] = useState(false);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
   const [alertSummary, setAlertSummary] = useState<AlertEvaluationSummary | null>(null);
+  const [loadingFlaky, setLoadingFlaky] = useState(false);
+  const [flakySummary, setFlakySummary] = useState<FlakyManagementSummary | null>(null);
+  const [flakyError, setFlakyError] = useState<string | null>(null);
+  const [flakyUpdatingId, setFlakyUpdatingId] = useState<string | null>(null);
   const [digestLoading, setDigestLoading] = useState(false);
   const [digestSummary, setDigestSummary] = useState<WeeklyDigestSummary | null>(null);
   const [digestDelivery, setDigestDelivery] = useState<WeeklyDigestDeliveryResult | null>(null);
@@ -279,6 +290,60 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const loadFlaky = useCallback(async () => {
+    setLoadingFlaky(true);
+    setFlakyError(null);
+    try {
+      const response = await fetch("/api/flaky");
+      const payload = (await response.json()) as FlakyResponse;
+      if (!response.ok || !payload.summary) {
+        throw new Error(payload.error || "Failed to load flaky job summary.");
+      }
+      setFlakySummary(payload.summary);
+    } catch (flakyLoadError) {
+      setFlakyError(
+        flakyLoadError instanceof Error
+          ? flakyLoadError.message
+          : "Failed to load flaky job summary.",
+      );
+    } finally {
+      setLoadingFlaky(false);
+    }
+  }, []);
+
+  const updateFlakyStatus = useCallback(
+    async (job: FlakyJobEntry, status: FlakyJobEntry["status"]) => {
+      setFlakyUpdatingId(job.id);
+      setFlakyError(null);
+      try {
+        const response = await fetch("/api/flaky", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            repo: job.repo,
+            workflow: job.workflow,
+            job_name: job.job_name,
+            status,
+          }),
+        });
+        const payload = (await response.json()) as FlakyResponse;
+        if (!response.ok || !payload.summary) {
+          throw new Error(payload.error || "Failed to update flaky job status.");
+        }
+        setFlakySummary(payload.summary);
+      } catch (flakyUpdateError) {
+        setFlakyError(
+          flakyUpdateError instanceof Error
+            ? flakyUpdateError.message
+            : "Failed to update flaky job status.",
+        );
+      } finally {
+        setFlakyUpdatingId(null);
+      }
+    },
+    [],
+  );
+
   const loadDigest = useCallback(async (deliver: boolean) => {
     setDigestLoading(true);
     setDigestError(null);
@@ -350,12 +415,13 @@ export default function DashboardPage() {
     void loadWorkflows();
     void loadHistorySnapshots();
     void loadAlerts();
+    void loadFlaky();
     void loadDigest(false);
 
     return () => {
       mounted = false;
     };
-  }, [loadAlerts, loadDigest, loadHistorySnapshots, runAnalysis]);
+  }, [loadAlerts, loadDigest, loadFlaky, loadHistorySnapshots, runAnalysis]);
 
   const severityCounts = useMemo(() => {
     const counts = {
@@ -477,6 +543,56 @@ export default function DashboardPage() {
         };
       });
   }, [historySnapshots]);
+
+  const costCenter = useMemo(() => {
+    if (!report) {
+      return null;
+    }
+
+    const runsPerMonth = alertSummary?.default_runs_per_month ?? 500;
+    const developerHourlyRate = alertSummary?.default_developer_hourly_rate ?? 150;
+    const categoryBuckets = new Map<string, { findings: number; savingsSec: number }>();
+    let totalSavingsSec = 0;
+    let criticalSavingsSec = 0;
+
+    for (const finding of report.findings) {
+      const category = finding.category || "Unknown";
+      const savingsSec = Math.max(0, finding.estimated_savings_secs ?? 0);
+      const current = categoryBuckets.get(category) ?? { findings: 0, savingsSec: 0 };
+      current.findings += 1;
+      current.savingsSec += savingsSec;
+      categoryBuckets.set(category, current);
+      totalSavingsSec += savingsSec;
+      if (finding.severity.toLowerCase() === "critical") {
+        criticalSavingsSec += savingsSec;
+      }
+    }
+
+    const rows = Array.from(categoryBuckets.entries())
+      .map(([category, value]) => {
+        const monthlyWasteUsd =
+          ((value.savingsSec * runsPerMonth) / 3600) * developerHourlyRate;
+        return {
+          category,
+          findings: value.findings,
+          savingsSec: Number(value.savingsSec.toFixed(2)),
+          monthlyWasteUsd: Number(monthlyWasteUsd.toFixed(2)),
+        };
+      })
+      .sort((left, right) => right.monthlyWasteUsd - left.monthlyWasteUsd);
+
+    const monthlyWasteUsd = ((totalSavingsSec * runsPerMonth) / 3600) * developerHourlyRate;
+    const criticalWasteUsd =
+      ((criticalSavingsSec * runsPerMonth) / 3600) * developerHourlyRate;
+
+    return {
+      runsPerMonth,
+      developerHourlyRate,
+      monthlyWasteUsd: Number(monthlyWasteUsd.toFixed(2)),
+      criticalWasteUsd: Number(criticalWasteUsd.toFixed(2)),
+      categories: rows.slice(0, 8),
+    };
+  }, [alertSummary, report]);
 
   const savingsSeconds = report
     ? Math.max(0, report.total_estimated_duration_secs - report.optimized_duration_secs)
@@ -752,6 +868,87 @@ export default function DashboardPage() {
                   ) : (
                     <p className="text-sm text-zinc-400">
                       Cost trend is computed from average duration and default labor-rate assumptions.
+                    </p>
+                  )}
+                </Panel>
+              </section>
+
+              <section className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <Panel title="Cost Center: Waste Breakdown">
+                  {costCenter ? (
+                    <>
+                      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <BenchmarkTile
+                          label="Monthly Waste"
+                          value={formatUsd(costCenter.monthlyWasteUsd)}
+                          sublabel={`${costCenter.runsPerMonth} runs/mo at $${costCenter.developerHourlyRate}/hr`}
+                          icon={Gauge}
+                        />
+                        <BenchmarkTile
+                          label="Critical Waste"
+                          value={formatUsd(costCenter.criticalWasteUsd)}
+                          sublabel="critical-severity opportunities"
+                          icon={AlertTriangle}
+                        />
+                        <BenchmarkTile
+                          label="Tracked Categories"
+                          value={String(costCenter.categories.length)}
+                          sublabel="waste sources in current analysis"
+                          icon={Workflow}
+                        />
+                      </div>
+                      {costCenter.categories.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={260}>
+                          <BarChart data={costCenter.categories} margin={{ top: 8, right: 8, left: -8, bottom: 0 }}>
+                            <CartesianGrid stroke="#3f3f46" strokeDasharray="3 3" />
+                            <XAxis dataKey="category" stroke="#a1a1aa" hide />
+                            <YAxis stroke="#a1a1aa" />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: "#09090b", border: "1px solid #3f3f46" }}
+                              labelStyle={{ color: "#e4e4e7" }}
+                              formatter={(value: number | string | undefined) =>
+                                formatUsd(Number(value ?? 0))
+                              }
+                            />
+                            <Bar dataKey="monthlyWasteUsd" fill="#f97316" radius={[6, 6, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <p className="text-sm text-zinc-400">
+                          No savings estimates are available in findings for this report.
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-zinc-400">
+                      Run an analysis to populate cost center metrics.
+                    </p>
+                  )}
+                </Panel>
+
+                <Panel title="Cost Center: Top Waste Sources">
+                  {costCenter && costCenter.categories.length > 0 ? (
+                    <ul className="space-y-2">
+                      {costCenter.categories.map((row) => (
+                        <li
+                          key={row.category}
+                          className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-zinc-100">{row.category}</p>
+                            <span className="text-sm font-semibold text-amber-200">
+                              {formatUsd(row.monthlyWasteUsd)}/mo
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-zinc-300">
+                            {row.findings} finding(s) • Estimated savings {formatDuration(row.savingsSec)}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-zinc-400">
+                      Cost center breakdown will appear once findings include estimated savings.
                     </p>
                   )}
                 </Panel>
@@ -1051,6 +1248,129 @@ export default function DashboardPage() {
                       {alertRules.length === 0
                         ? "No alert rules configured yet. Use POST /api/alerts to add threshold rules."
                         : "No threshold breaches detected in current snapshot cache."}
+                    </p>
+                  )}
+                </Panel>
+              </section>
+
+              <section className="mt-5">
+                <Panel title="Flaky Test Management (Quarantine / Track / Resolve)">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm text-zinc-400">
+                      Manage unstable jobs detected from webhook history snapshots.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void loadFlaky()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:border-cyan-400 hover:text-cyan-200"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${loadingFlaky ? "animate-spin" : ""}`} />
+                      Refresh
+                    </button>
+                  </div>
+
+                  {flakyError && (
+                    <p className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+                      {flakyError}
+                    </p>
+                  )}
+
+                  {flakySummary ? (
+                    <>
+                      <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
+                        <BenchmarkTile
+                          label="Total"
+                          value={String(flakySummary.total)}
+                          sublabel="tracked flaky jobs"
+                          icon={AlertTriangle}
+                        />
+                        <BenchmarkTile
+                          label="Open"
+                          value={String(flakySummary.open)}
+                          sublabel="active investigation"
+                          icon={Activity}
+                        />
+                        <BenchmarkTile
+                          label="Quarantined"
+                          value={String(flakySummary.quarantined)}
+                          sublabel="isolated from critical path"
+                          icon={Wrench}
+                        />
+                        <BenchmarkTile
+                          label="Resolved"
+                          value={String(flakySummary.resolved)}
+                          sublabel="stable after remediation"
+                          icon={CheckCircle2}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        {flakySummary.jobs.slice(0, 8).map((job) => (
+                          <article
+                            key={job.id}
+                            className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-semibold text-zinc-100">{job.job_name}</p>
+                                <p className="text-xs text-zinc-400">
+                                  {job.repo} • {job.workflow}
+                                </p>
+                              </div>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                  job.status === "open"
+                                    ? "bg-red-500/20 text-red-200"
+                                    : job.status === "quarantined"
+                                      ? "bg-amber-500/20 text-amber-200"
+                                      : "bg-emerald-500/20 text-emerald-200"
+                                }`}
+                              >
+                                {job.status}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-zinc-300">
+                              Observed in {job.observed_count} snapshot(s) • Last seen{" "}
+                              {new Date(job.last_seen_at).toLocaleString()}
+                            </p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <button
+                                type="button"
+                                onClick={() => void updateFlakyStatus(job, "quarantined")}
+                                disabled={flakyUpdatingId === job.id}
+                                className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 transition hover:border-amber-400 hover:text-amber-200 disabled:opacity-50"
+                              >
+                                Quarantine
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void updateFlakyStatus(job, "resolved")}
+                                disabled={flakyUpdatingId === job.id}
+                                className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 transition hover:border-emerald-400 hover:text-emerald-200 disabled:opacity-50"
+                              >
+                                Resolve
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void updateFlakyStatus(job, "open")}
+                                disabled={flakyUpdatingId === job.id}
+                                className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 transition hover:border-cyan-400 hover:text-cyan-200 disabled:opacity-50"
+                              >
+                                Reopen
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                        {flakySummary.jobs.length === 0 && (
+                          <p className="text-sm text-zinc-400">
+                            No flaky jobs detected in current history snapshots.
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-zinc-400">
+                      No flaky summary available yet.
                     </p>
                   )}
                 </Panel>

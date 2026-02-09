@@ -242,6 +242,41 @@ export interface WeeklyDigestDeliveryResult {
   errors: string[];
 }
 
+export type FlakyJobStatus = "open" | "quarantined" | "resolved";
+
+export interface FlakyJobEntry {
+  id: string;
+  repo: string;
+  workflow: string;
+  provider: string;
+  job_name: string;
+  status: FlakyJobStatus;
+  observed_count: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  owner?: string;
+  notes?: string;
+  updated_at: string;
+}
+
+export interface FlakyJobUpdateInput {
+  repo: string;
+  workflow: string;
+  job_name: string;
+  status: FlakyJobStatus;
+  owner?: string;
+  notes?: string;
+}
+
+export interface FlakyManagementSummary {
+  updated_at: string;
+  total: number;
+  open: number;
+  quarantined: number;
+  resolved: number;
+  jobs: FlakyJobEntry[];
+}
+
 const PIPELINE_EXTENSIONS = [".yml", ".yaml", ".groovy", ".jenkinsfile"];
 const SEARCH_ROOTS = [".github/workflows", "tests/fixtures"];
 const HISTORY_CACHE_RELATIVE_DIR = ".pipelinex/history-cache";
@@ -249,6 +284,7 @@ const BENCHMARK_REGISTRY_RELATIVE_PATH = ".pipelinex/benchmark-registry.json";
 const IMPACT_REGISTRY_RELATIVE_PATH = ".pipelinex/optimization-impact-registry.json";
 const ALERT_RULES_RELATIVE_PATH = ".pipelinex/alert-rules.json";
 const DIGEST_EMAIL_OUTBOX_RELATIVE_PATH = ".pipelinex/digest-email-outbox.jsonl";
+const FLAKY_MANAGEMENT_RELATIVE_PATH = ".pipelinex/flaky-management.json";
 
 function pathExists(filePath: string): Promise<boolean> {
   return access(filePath, constants.F_OK)
@@ -1421,6 +1457,210 @@ export async function evaluateAlertRules(
     triggered_count: triggers.length,
     triggers,
   };
+}
+
+interface FlakyJobOverride {
+  key: string;
+  status: FlakyJobStatus;
+  owner?: string;
+  notes?: string;
+  updated_at: string;
+}
+
+function flakyManagementPath(repoRoot: string): string {
+  return path.join(repoRoot, FLAKY_MANAGEMENT_RELATIVE_PATH);
+}
+
+function flakyJobKey(repo: string, workflow: string, jobName: string): string {
+  return `${repo}::${workflow}::${jobName}`;
+}
+
+function normalizeFlakyStatus(value: unknown): FlakyJobStatus {
+  if (value === "open" || value === "quarantined" || value === "resolved") {
+    return value;
+  }
+  throw new Error("status must be one of: open, quarantined, resolved.");
+}
+
+async function readFlakyManagementOverrides(): Promise<FlakyJobOverride[]> {
+  const repoRoot = await getRepoRoot();
+  const filePath = flakyManagementPath(repoRoot);
+  if (!(await pathExists(filePath))) {
+    return [];
+  }
+
+  const raw = await readFile(filePath, "utf8");
+  if (!raw.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as FlakyJobOverride[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter(
+      (entry) =>
+        typeof entry?.key === "string" &&
+        (entry?.status === "open" ||
+          entry?.status === "quarantined" ||
+          entry?.status === "resolved") &&
+        typeof entry?.updated_at === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function writeFlakyManagementOverrides(overrides: FlakyJobOverride[]): Promise<void> {
+  const repoRoot = await getRepoRoot();
+  const filePath = flakyManagementPath(repoRoot);
+  await mkdir(path.dirname(filePath), { recursive: true });
+  await writeFile(filePath, JSON.stringify(overrides, null, 2), "utf8");
+}
+
+interface AggregatedFlakyJob {
+  repo: string;
+  workflow: string;
+  provider: string;
+  job_name: string;
+  observed_count: number;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export async function listFlakyJobs(): Promise<FlakyManagementSummary> {
+  const snapshots = await listHistorySnapshots();
+  const overrides = await readFlakyManagementOverrides();
+  const overrideMap = new Map<string, FlakyJobOverride>();
+  for (const override of overrides) {
+    overrideMap.set(override.key, override);
+  }
+
+  const aggregate = new Map<string, AggregatedFlakyJob>();
+  for (const snapshot of snapshots) {
+    const provider = inferProviderFromSnapshot(snapshot);
+    for (const rawJobName of snapshot.stats.flaky_jobs) {
+      const jobName = rawJobName.trim();
+      if (!jobName) {
+        continue;
+      }
+
+      const key = flakyJobKey(snapshot.repo, snapshot.workflow, jobName);
+      const existing = aggregate.get(key);
+      if (!existing) {
+        aggregate.set(key, {
+          repo: snapshot.repo,
+          workflow: snapshot.workflow,
+          provider,
+          job_name: jobName,
+          observed_count: 1,
+          first_seen_at: snapshot.refreshed_at,
+          last_seen_at: snapshot.refreshed_at,
+        });
+        continue;
+      }
+
+      existing.observed_count += 1;
+      if (snapshot.refreshed_at < existing.first_seen_at) {
+        existing.first_seen_at = snapshot.refreshed_at;
+      }
+      if (snapshot.refreshed_at > existing.last_seen_at) {
+        existing.last_seen_at = snapshot.refreshed_at;
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
+  const jobs: FlakyJobEntry[] = Array.from(aggregate.entries()).map(([key, entry]) => {
+    const override = overrideMap.get(key);
+    return {
+      id: key,
+      repo: entry.repo,
+      workflow: entry.workflow,
+      provider: entry.provider,
+      job_name: entry.job_name,
+      status: override?.status ?? "open",
+      observed_count: entry.observed_count,
+      first_seen_at: entry.first_seen_at,
+      last_seen_at: entry.last_seen_at,
+      owner: override?.owner,
+      notes: override?.notes,
+      updated_at: override?.updated_at ?? now,
+    };
+  });
+
+  for (const override of overrides) {
+    if (aggregate.has(override.key)) {
+      continue;
+    }
+
+    const [repo = "unknown", workflow = "unknown", jobName = "unknown"] =
+      override.key.split("::");
+    jobs.push({
+      id: override.key,
+      repo,
+      workflow,
+      provider: "unknown",
+      job_name: jobName,
+      status: override.status,
+      observed_count: 0,
+      first_seen_at: override.updated_at,
+      last_seen_at: override.updated_at,
+      owner: override.owner,
+      notes: override.notes,
+      updated_at: override.updated_at,
+    });
+  }
+
+  jobs.sort((left, right) => {
+    if (right.observed_count !== left.observed_count) {
+      return right.observed_count - left.observed_count;
+    }
+    return right.last_seen_at.localeCompare(left.last_seen_at);
+  });
+
+  return {
+    updated_at: now,
+    total: jobs.length,
+    open: jobs.filter((job) => job.status === "open").length,
+    quarantined: jobs.filter((job) => job.status === "quarantined").length,
+    resolved: jobs.filter((job) => job.status === "resolved").length,
+    jobs,
+  };
+}
+
+export async function upsertFlakyJobStatus(
+  input: FlakyJobUpdateInput,
+): Promise<FlakyManagementSummary> {
+  const repo = input.repo?.trim();
+  const workflow = input.workflow?.trim();
+  const jobName = input.job_name?.trim();
+  if (!repo || !workflow || !jobName) {
+    throw new Error("repo, workflow, and job_name are required.");
+  }
+
+  const status = normalizeFlakyStatus(input.status);
+  const key = flakyJobKey(repo, workflow, jobName);
+  const now = new Date().toISOString();
+  const overrides = await readFlakyManagementOverrides();
+  const index = overrides.findIndex((entry) => entry.key === key);
+  const override: FlakyJobOverride = {
+    key,
+    status,
+    owner: normalizeOptionalText(input.owner),
+    notes: normalizeOptionalText(input.notes),
+    updated_at: now,
+  };
+
+  if (index >= 0) {
+    overrides[index] = override;
+  } else {
+    overrides.push(override);
+  }
+
+  await writeFlakyManagementOverrides(overrides);
+  return listFlakyJobs();
 }
 
 interface WeeklyDigestOptions {
