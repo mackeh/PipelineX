@@ -355,6 +355,42 @@ export default function DashboardPage() {
   );
 
   const topFindings = useMemo(() => report?.findings.slice(0, 8) ?? [], [report]);
+  const bottleneckCategoryRows = useMemo(() => {
+    if (!report) {
+      return [] as Array<{ label: string; count: number }>;
+    }
+
+    const buckets = new Map<string, number>();
+    for (const finding of report.findings) {
+      const key = finding.category || "Unknown";
+      buckets.set(key, (buckets.get(key) ?? 0) + 1);
+    }
+
+    return Array.from(buckets.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  }, [report]);
+
+  const bottleneckJobRows = useMemo(() => {
+    if (!report) {
+      return [] as Array<{ label: string; count: number }>;
+    }
+
+    const buckets = new Map<string, number>();
+    for (const finding of report.findings) {
+      for (const job of finding.affected_jobs) {
+        const key = job || "(unknown)";
+        buckets.set(key, (buckets.get(key) ?? 0) + 1);
+      }
+    }
+
+    return Array.from(buckets.entries())
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+  }, [report]);
+
   const savingsSeconds = report
     ? Math.max(0, report.total_estimated_duration_secs - report.optimized_duration_secs)
     : 0;
@@ -537,6 +573,48 @@ export default function DashboardPage() {
                       <p className="text-sm text-zinc-400">No findings for this pipeline.</p>
                     )}
                   </div>
+                </Panel>
+              </section>
+
+              <section className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <Panel title="Bottleneck Drilldown: Categories">
+                  {bottleneckCategoryRows.length > 0 ? (
+                    <ul className="space-y-2">
+                      {bottleneckCategoryRows.map((row) => (
+                        <li
+                          key={row.label}
+                          className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm"
+                        >
+                          <span className="text-zinc-200">{row.label}</span>
+                          <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
+                            {row.count}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-zinc-400">No category hotspots available.</p>
+                  )}
+                </Panel>
+
+                <Panel title="Bottleneck Drilldown: Job Hotspots">
+                  {bottleneckJobRows.length > 0 ? (
+                    <ul className="space-y-2">
+                      {bottleneckJobRows.map((row) => (
+                        <li
+                          key={row.label}
+                          className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm"
+                        >
+                          <span className="text-zinc-200">{row.label}</span>
+                          <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">
+                            {row.count}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-zinc-400">No job hotspot data available.</p>
+                  )}
                 </Panel>
               </section>
 
