@@ -804,6 +804,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - [docs/MULTI_REPO_ANALYSIS.md](docs/MULTI_REPO_ANALYSIS.md) - Cross-repo orchestration and monorepo risk analysis
 - [docs/RUNNER_SIZING.md](docs/RUNNER_SIZING.md) - Resource-profiled runner right-sizing recommendations
 - [docs/ALERTS.md](docs/ALERTS.md) - Threshold-based alert rules for duration, failure rate, and cost
+- [docs/GITHUB_APP_PR_ANALYSIS.md](docs/GITHUB_APP_PR_ANALYSIS.md) - GitHub App PR webhook analysis and automated PR comments
 - [docs/PLUGINS.md](docs/PLUGINS.md) - External plugin manifest and protocol
 - [.github/workflow-templates/](.github/workflow-templates/) - GitHub Actions templates
 - [tests/fixtures/](tests/fixtures/) - Example pipelines
@@ -814,7 +815,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 - **Phase 1:** ✅ Core engine, GitHub Actions parser, CLI
 - **Phase 2:** ✅ Multi-platform (8 CI systems), simulation, visualization
-- **Phase 3:** 🚧 Platform features in progress (dashboard explorer + bottleneck drilldown, GitHub+GitLab webhook ingestion, threshold alerting, and team-facing APIs shipped)
+- **Phase 3:** 🚧 Platform features in progress (dashboard explorer + bottleneck drilldown, GitHub App PR comments, GitHub+GitLab webhook ingestion, threshold alerting, and team-facing APIs shipped)
 - **Phase 4:** ✅ Complete (benchmarks, optimization impact tracking, migration assistant, runner right-sizing, multi-repo analysis, public/enterprise API hardening, self-hosted deploy, REST API, VS Code extension, plugin scaffold)
 
 ---

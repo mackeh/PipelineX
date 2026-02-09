@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `GET|POST|DELETE /api/alerts`
   - `GET /api/alerts/evaluate`
 - Dashboard bottleneck drilldown panels for finding-category and affected-job hotspots.
+- GitHub App PR analysis webhook endpoint with automated PR comment upsert:
+  - `POST /api/github/app/webhook`
 
 ### Changed
 - `analyze` now emits runner right-sizing findings in optimization reports.

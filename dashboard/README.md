@@ -4,6 +4,7 @@ The dashboard now supports:
 
 - Live pipeline analysis from real `pipelinex` CLI output
 - Bottleneck drilldown panels (category and job hotspots)
+- GitHub App-style PR webhook analysis and automatic PR comments
 - GitHub webhook ingestion for workflow history refresh
 - GitLab webhook ingestion for pipeline history refresh
 - Threshold-based alerting (duration, failure rate, opportunity cost)
@@ -50,6 +51,14 @@ Accepts GitHub webhook payloads and refreshes history cache when:
 
 - `x-github-event = workflow_run`
 - `action = completed`
+
+### `POST /api/github/app/webhook`
+
+Processes GitHub `pull_request` events and:
+
+- Fetches changed workflow files in the PR
+- Analyzes workflow file contents with PipelineX
+- Creates/updates a PR comment with analysis summary and hotspots
 
 ### `POST /api/gitlab/webhook`
 
@@ -206,7 +215,9 @@ Custom integration scopes:
 ## Environment variables
 
 - `GITHUB_TOKEN`: used for history refresh calls.
+- `GITHUB_APP_TOKEN`: token used by `/api/github/app/webhook` for PR file reads and comment writes (falls back to `GITHUB_TOKEN`).
 - `GITHUB_WEBHOOK_SECRET`: enables webhook signature validation.
+- `GITHUB_APP_WEBHOOK_SECRET`: optional dedicated webhook secret for `/api/github/app/webhook`.
 - `GITLAB_WEBHOOK_TOKEN` or `GITLAB_WEBHOOK_SECRET_TOKEN`: optional shared token validation for GitLab webhooks.
 - `PIPELINEX_GITLAB_WORKFLOW_PATH`: optional workflow identifier stored for GitLab snapshots (default `.gitlab-ci.yml`).
 - `PIPELINEX_HISTORY_RUNS`: optional lookback window for webhook-triggered refreshes (default `100`).

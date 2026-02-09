@@ -780,7 +780,7 @@ pipelinex/
 
 **Goal:** GitHub App, web dashboard, team features.
 
-- [ ] GitHub App with automatic PR analysis and comments
+- [x] GitHub App with automatic PR analysis and comments
 - [x] GitLab webhook integration
 - [x] Web dashboard: overview, pipeline explorer, bottleneck drilldown
 - [ ] Interactive DAG visualization (D3.js)
