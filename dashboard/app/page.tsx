@@ -609,7 +609,7 @@ export default function DashboardPage() {
                 <Panel title="Webhook History Cache">
                   <div className="mb-3 flex items-center justify-between">
                     <p className="text-sm text-zinc-400">
-                      Recent snapshots refreshed by GitHub webhook events.
+                      Recent snapshots refreshed by GitHub or GitLab webhook events.
                     </p>
                     <button
                       type="button"
@@ -638,7 +638,7 @@ export default function DashboardPage() {
                     ))}
                     {!loadingHistory && historySnapshots.length === 0 && (
                       <p className="text-sm text-zinc-400">
-                        No cached history yet. Send a `workflow_run` webhook to populate this panel.
+                        No cached history yet. Send a GitHub `workflow_run` or GitLab `pipeline` webhook to populate this panel.
                       </p>
                     )}
                   </div>

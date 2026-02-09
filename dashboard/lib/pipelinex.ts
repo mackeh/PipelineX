@@ -359,14 +359,29 @@ export async function analyzePipelineFile(inputPath: string): Promise<AnalysisRe
   }
 }
 
-function validateRepoFullName(repo: string): void {
+function validateRepoIdentifier(repo: string): void {
   if (!repo || repo.trim().length === 0) {
-    throw new Error("repo is required in owner/repo format.");
+    throw new Error("repo is required in namespace/project format.");
   }
 
-  const parts = repo.split("/");
-  if (parts.length !== 2 || !parts[0] || !parts[1]) {
-    throw new Error("repo must be in owner/repo format.");
+  const parts = repo
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+
+  if (parts.length < 2) {
+    throw new Error("repo must be in namespace/project format.");
+  }
+}
+
+function validateGithubRepoFullName(repo: string): void {
+  const parts = repo
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+
+  if (parts.length !== 2) {
+    throw new Error("GitHub history refresh requires repo in owner/repo format.");
   }
 }
 
@@ -404,7 +419,7 @@ export async function readHistorySnapshot(
   repo: string,
   workflow: string,
 ): Promise<HistorySnapshot | null> {
-  validateRepoFullName(repo);
+  validateRepoIdentifier(repo);
   const normalizedWorkflow = normalizeWorkflow(workflow);
   const cachePath = await historyCacheFilePath(repo, normalizedWorkflow);
   const exists = await pathExists(cachePath);
@@ -460,10 +475,43 @@ interface RefreshHistoryOptions {
   workflowRunId?: number;
 }
 
+interface StoreHistorySnapshotOptions {
+  repo: string;
+  workflow: string;
+  runs?: number;
+  source?: "manual" | "webhook";
+  stats: PipelineStatistics;
+  deliveryId?: string;
+  workflowRunId?: number;
+}
+
+export async function storeHistorySnapshot(
+  options: StoreHistorySnapshotOptions,
+): Promise<HistorySnapshot> {
+  validateRepoIdentifier(options.repo);
+  const workflow = normalizeWorkflow(options.workflow);
+  const runs = options.runs && options.runs > 0 ? options.runs : 1;
+
+  const snapshot: HistorySnapshot = {
+    repo: options.repo,
+    workflow,
+    runs,
+    refreshed_at: new Date().toISOString(),
+    source: options.source ?? "manual",
+    stats: options.stats,
+    delivery_id: options.deliveryId,
+    workflow_run_id: options.workflowRunId,
+  };
+
+  await writeHistorySnapshot(snapshot);
+  return snapshot;
+}
+
 export async function refreshHistorySnapshot(
   options: RefreshHistoryOptions,
 ): Promise<HistorySnapshot> {
-  validateRepoFullName(options.repo);
+  validateRepoIdentifier(options.repo);
+  validateGithubRepoFullName(options.repo);
   const workflow = normalizeWorkflow(options.workflow);
   const runs = options.runs && options.runs > 0 ? options.runs : 100;
 
