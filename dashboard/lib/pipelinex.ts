@@ -398,7 +398,7 @@ export async function resolveRepoPath(inputPath: string): Promise<string> {
   return absoluteCandidate;
 }
 
-async function findPipelinexCommand(repoRoot: string): Promise<string[]> {
+export async function findPipelinexCommand(repoRoot: string): Promise<string[]> {
   const localBinaries = [
     path.join(repoRoot, "target", "debug", "pipelinex"),
     path.join(repoRoot, "target", "release", "pipelinex"),

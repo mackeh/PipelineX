@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock3,
   Gauge,
+  GitMerge,
   Play,
   RefreshCw,
   Trophy,
@@ -141,6 +142,9 @@ export default function DashboardPage() {
   const [benchmarkSubmitting, setBenchmarkSubmitting] = useState(false);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
   const [benchmarkError, setBenchmarkError] = useState<string | null>(null);
+  const [applyingOptimization, setApplyingOptimization] = useState(false);
+  const [applySuccess, setApplySuccess] = useState<{ prUrl?: string; prNumber?: number; branch?: string } | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
@@ -238,6 +242,57 @@ export default function DashboardPage() {
       setRunningAnalysis(false);
     }
   }, [submitBenchmark]);
+
+  const applyOptimization = useCallback(async (pipelinePath: string) => {
+    if (!pipelinePath) {
+      return;
+    }
+
+    setApplyingOptimization(true);
+    setApplyError(null);
+    setApplySuccess(null);
+
+    try {
+      const response = await fetch("/api/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pipelinePath,
+          baseBranch: "main",
+          noPr: false,
+        }),
+      });
+
+      type ApplyResponse = {
+        success?: boolean;
+        prUrl?: string;
+        prNumber?: number;
+        branch?: string;
+        message?: string;
+        error?: string;
+      };
+
+      const payload = (await response.json()) as ApplyResponse;
+
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || "Failed to apply optimization.");
+      }
+
+      setApplySuccess({
+        prUrl: payload.prUrl,
+        prNumber: payload.prNumber,
+        branch: payload.branch,
+      });
+    } catch (applyErr) {
+      setApplyError(
+        applyErr instanceof Error
+          ? applyErr.message
+          : "Failed to apply optimization unexpectedly.",
+      );
+    } finally {
+      setApplyingOptimization(false);
+    }
+  }, []);
 
   const loadHistorySnapshots = useCallback(async () => {
     setLoadingHistory(true);
@@ -668,6 +723,18 @@ export default function DashboardPage() {
                   {runningAnalysis ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                   {runningAnalysis ? "Analyzing..." : "Run Analysis"}
                 </button>
+
+                {report && report.findings.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void applyOptimization(selectedPath)}
+                    disabled={!selectedPath || applyingOptimization}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {applyingOptimization ? <RefreshCw className="h-4 w-4 animate-spin" /> : <GitMerge className="h-4 w-4" />}
+                    {applyingOptimization ? "Creating PR..." : "Apply & Create PR"}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -681,6 +748,40 @@ export default function DashboardPage() {
           {error && (
             <section className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
               {error}
+            </section>
+          )}
+
+          {applyError && (
+            <section className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-100">
+              <strong>Apply Error:</strong> {applyError}
+            </section>
+          )}
+
+          {applySuccess && (
+            <section className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <strong>Pull Request Created Successfully!</strong>
+                  {applySuccess.prUrl && (
+                    <p className="mt-1">
+                      <a
+                        href={applySuccess.prUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-200 underline hover:text-emerald-100"
+                      >
+                        View PR #{applySuccess.prNumber || ""}
+                      </a>
+                    </p>
+                  )}
+                  {applySuccess.branch && (
+                    <p className="mt-1 text-xs text-emerald-200">
+                      Branch: {applySuccess.branch}
+                    </p>
+                  )}
+                </div>
+              </div>
             </section>
           )}
 
