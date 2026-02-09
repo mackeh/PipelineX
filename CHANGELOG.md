@@ -7,12 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-02-09
+
+### 🎉 Phase 3 Complete!
+
+All Phase 3 features are now production-ready. This release marks PipelineX as a fully-featured platform.
+
 ### Added
+- **One-Click PR Creation**: New `pipelinex apply` command for automated optimization deployment
+  - Automatically analyzes, optimizes, creates branch, commits, and creates GitHub PR
+  - Supports custom base branches and repository detection
+  - Includes detailed PR descriptions with before/after metrics
+- **Dashboard Apply Button**: "Apply & Create PR" button in dashboard UI
+  - Appears when analysis finds optimization opportunities
+  - Shows success messages with direct PR links
+  - New API endpoint: `POST /api/apply`
+- **Team Management System**: Full team organization and member management
+  - Create teams with roles (admin, member, viewer)
+  - Associate pipelines with teams
+  - Team-specific settings (runs/month, developer rates, alert channels)
+  - Storage in `.pipelinex/teams-registry.json`
+- **Team Management API**: Complete REST API for teams
+  - `GET /api/teams` - List all teams
+  - `POST /api/teams` - Create new team
+  - `GET /api/teams/:id` - Get team details
+  - `PUT /api/teams/:id` - Update team
+  - `DELETE /api/teams/:id` - Delete team
+  - `POST /api/teams/:id/members` - Add member
+  - `DELETE /api/teams/:id/members/:userId` - Remove member
+- **Organization-Level Views**: Aggregate analytics across all teams
+  - Total teams and pipelines count
+  - Average health score across organization
+  - Total monthly cost tracking
+  - Team-by-team breakdown with costs
+  - New API endpoint: `GET /api/org/metrics`
+- **Dashboard Team Management UI**:
+  - Teams list with inline creation
+  - Team cards showing members, pipelines, creation dates
+  - Organization overview dashboard
+  - Auto-loads on dashboard startup
+- **GitHub API Enhancement**: Added `create_pull_request()` method to GitHubClient
 - Dashboard flaky-job management endpoint and persistence:
   - `GET|POST /api/flaky`
   - `.pipelinex/flaky-management.json` status overrides (`open`, `quarantined`, `resolved`)
-- Dashboard flaky test management UI with one-click quarantine, resolve, and reopen actions.
-- Dashboard cost center view with finding-category waste breakdown and estimated monthly opportunity cost.
+- Dashboard flaky test management UI with one-click quarantine, resolve, and reopen actions
+- Dashboard cost center view with finding-category waste breakdown and estimated monthly opportunity cost
+
+### Changed
+- Updated README.md to reflect Phase 3 completion
+- Enhanced documentation across all files
+- Improved error handling in team operations
+- Better git repository detection in apply command
+
+### Phase Status
+- ✅ Phase 1: Complete (Core engine, CLI)
+- ✅ Phase 2: Complete (Multi-platform, 8 CI systems)
+- ✅ Phase 3: Complete (Platform features, teams, org views) ← THIS RELEASE
+- ✅ Phase 4: Complete (Enterprise, benchmarks, API, plugins)
 
 ## [1.4.0] - 2026-02-09
 

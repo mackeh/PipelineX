@@ -580,6 +580,7 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 | `analyze`      | Analyze pipelines for bottlenecks          | `pipelinex analyze .github/workflows/ci.yml`                     |
 | `optimize`     | Generate optimized config                  | `pipelinex optimize ci.yml -o ci-opt.yml`                        |
 | `diff`         | Show changes between current and optimized | `pipelinex diff ci.yml`                                          |
+| `apply`        | Apply optimization & create PR (one-click) | `pipelinex apply .github/workflows/ci.yml --repo owner/repo`     |
 | `cost`         | Estimate CI/CD costs and savings           | `pipelinex cost .github/workflows/ --team-size 10`               |
 | `graph`        | Visualize pipeline DAG                     | `pipelinex graph ci.yml --format mermaid`                        |
 | `simulate`     | Monte Carlo simulation                     | `pipelinex simulate ci.yml --runs 1000`                          |
@@ -815,7 +816,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
 - **Phase 1:** ✅ Core engine, GitHub Actions parser, CLI
 - **Phase 2:** ✅ Multi-platform (8 CI systems), simulation, visualization
-- **Phase 3:** 🚧 Platform features in progress (interactive DAG explorer, trend charts, flaky management UI, cost center waste dashboard, weekly digest API, bottleneck drilldown, GitHub App PR comments, GitHub+GitLab webhook ingestion, threshold alerting, and team-facing APIs shipped)
+- **Phase 3:** ✅ **Complete!** Platform features (interactive DAG explorer, trend charts, flaky management UI, cost center dashboard, weekly digest API, GitHub App PR comments, webhook ingestion, threshold alerting, **one-click PR creation**, **team management & org-level views**)
 - **Phase 4:** ✅ Complete (benchmarks, optimization impact tracking, migration assistant, runner right-sizing, multi-repo analysis, public/enterprise API hardening, self-hosted deploy, REST API, VS Code extension, plugin scaffold)
 
 ---
