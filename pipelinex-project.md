@@ -805,7 +805,7 @@ pipelinex/
 - [x] Self-hosted deployment (Docker Compose + Helm chart)
 - [x] REST API for custom integrations
 - [x] CI provider migration assistant ("convert GitHub Actions → GitLab CI")
-- [ ] Runner right-sizing recommendations (based on resource profiling)
+- [x] Runner right-sizing recommendations (based on resource profiling)
 - [x] Multi-repo pipeline analysis (monorepo orchestration detection)
 - [x] Plugin system for custom analyzers and optimizers
 

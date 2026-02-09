@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned Features
-- Runner right-sizing recommendations (based on resource profiling)
+### Added
+- Runner right-sizing recommendation engine based on inferred per-job resource profiling.
+- New `pipelinex right-size` CLI command with `text` and `json` output formats.
+
+### Changed
+- `analyze` now emits runner right-sizing findings in optimization reports.
 
 ## [1.3.0] - 2026-02-09
 

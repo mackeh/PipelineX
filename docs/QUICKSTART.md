@@ -454,6 +454,7 @@ ls .github/workflows/*.yml | xargs -P 4 -I {} pipelinex analyze {}
 | `pipelinex graph <file>` | Visualize pipeline DAG |
 | `pipelinex migrate <file> --to gitlab-ci` | Convert GitHub Actions workflow to GitLab CI |
 | `pipelinex multi-repo <dir>` | Analyze cross-repo orchestration and monorepo risks |
+| `pipelinex right-size <file-or-dir>` | Recommend runner size changes from inferred resource profiles |
 | `pipelinex --help` | Show all commands |
 
 ---
