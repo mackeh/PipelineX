@@ -10,10 +10,13 @@ import {
   Gauge,
   GitMerge,
   Play,
+  Plus,
   RefreshCw,
   Trophy,
+  Users,
   Workflow,
   Wrench,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -37,6 +40,8 @@ import type {
   FlakyManagementSummary,
   Finding,
   HistorySnapshot,
+  OrgLevelMetrics,
+  Team,
   WeeklyDigestDeliveryResult,
   WeeklyDigestSummary,
 } from "@/lib/pipelinex";
@@ -145,6 +150,12 @@ export default function DashboardPage() {
   const [applyingOptimization, setApplyingOptimization] = useState(false);
   const [applySuccess, setApplySuccess] = useState<{ prUrl?: string; prNumber?: number; branch?: string } | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+  const [showCreateTeam, setShowCreateTeam] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+  const [orgMetrics, setOrgMetrics] = useState<OrgLevelMetrics | null>(null);
+  const [loadingOrgMetrics, setLoadingOrgMetrics] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
@@ -291,6 +302,69 @@ export default function DashboardPage() {
       );
     } finally {
       setApplyingOptimization(false);
+    }
+  }, []);
+
+  const loadTeams = useCallback(async () => {
+    setLoadingTeams(true);
+    try {
+      const response = await fetch("/api/teams");
+      type TeamsResponse = { teams?: Team[]; error?: string };
+      const payload = (await response.json()) as TeamsResponse;
+      if (!response.ok || !payload.teams) {
+        throw new Error(payload.error || "Failed to load teams.");
+      }
+      setTeams(payload.teams);
+    } catch (teamsError) {
+      console.error("Failed to load teams:", teamsError);
+    } finally {
+      setLoadingTeams(false);
+    }
+  }, []);
+
+  const createTeam = useCallback(async () => {
+    if (!newTeamName.trim()) {
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/teams", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newTeamName }),
+      });
+
+      type TeamResponse = { team?: Team; error?: string };
+      const payload = (await response.json()) as TeamResponse;
+
+      if (!response.ok || !payload.team) {
+        throw new Error(payload.error || "Failed to create team.");
+      }
+
+      setNewTeamName("");
+      setShowCreateTeam(false);
+      await loadTeams();
+    } catch (teamError) {
+      setError(
+        teamError instanceof Error ? teamError.message : "Failed to create team.",
+      );
+    }
+  }, [newTeamName, loadTeams]);
+
+  const loadOrgMetrics = useCallback(async () => {
+    setLoadingOrgMetrics(true);
+    try {
+      const response = await fetch("/api/org/metrics");
+      type OrgMetricsResponse = { metrics?: OrgLevelMetrics; error?: string };
+      const payload = (await response.json()) as OrgMetricsResponse;
+      if (!response.ok || !payload.metrics) {
+        throw new Error(payload.error || "Failed to load org metrics.");
+      }
+      setOrgMetrics(payload.metrics);
+    } catch (metricsError) {
+      console.error("Failed to load org metrics:", metricsError);
+    } finally {
+      setLoadingOrgMetrics(false);
     }
   }, []);
 
@@ -472,11 +546,13 @@ export default function DashboardPage() {
     void loadAlerts();
     void loadFlaky();
     void loadDigest(false);
+    void loadTeams();
+    void loadOrgMetrics();
 
     return () => {
       mounted = false;
     };
-  }, [loadAlerts, loadDigest, loadFlaky, loadHistorySnapshots, runAnalysis]);
+  }, [loadAlerts, loadDigest, loadFlaky, loadHistorySnapshots, loadTeams, loadOrgMetrics, runAnalysis]);
 
   const severityCounts = useMemo(() => {
     const counts = {
@@ -1590,6 +1666,154 @@ export default function DashboardPage() {
                 </Panel>
               </section>
             </>
+          )}
+
+          {/* Team Management Section */}
+          <section className="mt-5">
+            <Panel title="Team Management">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-5 w-5 text-cyan-400" />
+                    <h3 className="text-sm font-semibold text-zinc-100">Teams ({teams.length})</h3>
+                  </div>
+                  {!showCreateTeam && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateTeam(true)}
+                      className="inline-flex items-center gap-1 rounded-lg bg-cyan-500/20 px-3 py-1.5 text-xs font-medium text-cyan-200 transition hover:bg-cyan-500/30"
+                    >
+                      <Plus className="h-3 w-3" />
+                      New Team
+                    </button>
+                  )}
+                </div>
+
+                {showCreateTeam && (
+                  <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-3">
+                    <div className="space-y-3">
+                      <div>
+                        <label className="mb-1 block text-xs text-zinc-400">Team Name</label>
+                        <input
+                          type="text"
+                          value={newTeamName}
+                          onChange={(e) => setNewTeamName(e.target.value)}
+                          placeholder="Engineering, QA, DevOps..."
+                          className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-cyan-400 focus:outline-none"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void createTeam()}
+                          disabled={!newTeamName.trim()}
+                          className="rounded-lg bg-cyan-500 px-3 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Create
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCreateTeam(false);
+                            setNewTeamName("");
+                          }}
+                          className="rounded-lg bg-zinc-700 px-3 py-1.5 text-xs font-semibold text-zinc-100 transition hover:bg-zinc-600"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {loadingTeams ? (
+                  <div className="flex items-center gap-2 py-6 text-sm text-zinc-400">
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Loading teams...
+                  </div>
+                ) : teams.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-zinc-400">
+                    No teams yet. Create your first team to get started.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {teams.map((team) => (
+                      <div
+                        key={team.id}
+                        className="rounded-lg border border-zinc-700 bg-zinc-900 p-3"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-semibold text-zinc-100">{team.name}</h4>
+                            {team.description && (
+                              <p className="mt-1 text-xs text-zinc-400">{team.description}</p>
+                            )}
+                            <div className="mt-2 flex items-center gap-3 text-xs text-zinc-500">
+                              <span>{team.members.length} members</span>
+                              <span>•</span>
+                              <span>{team.settings.pipeline_paths?.length || 0} pipelines</span>
+                              <span>•</span>
+                              <span>Created {new Date(team.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Panel>
+          </section>
+
+          {/* Organization Metrics Section */}
+          {orgMetrics && (
+            <section className="mt-5">
+              <Panel title="Organization Overview">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-lg bg-zinc-800/50 p-3">
+                    <p className="text-xs uppercase tracking-wide text-zinc-400">Total Teams</p>
+                    <p className="mt-1 text-2xl font-bold text-zinc-100">{orgMetrics.total_teams}</p>
+                  </div>
+                  <div className="rounded-lg bg-zinc-800/50 p-3">
+                    <p className="text-xs uppercase tracking-wide text-zinc-400">Total Pipelines</p>
+                    <p className="mt-1 text-2xl font-bold text-zinc-100">{orgMetrics.total_pipelines}</p>
+                  </div>
+                  <div className="rounded-lg bg-zinc-800/50 p-3">
+                    <p className="text-xs uppercase tracking-wide text-zinc-400">Avg Health Score</p>
+                    <p className="mt-1 text-2xl font-bold text-cyan-400">
+                      {orgMetrics.avg_health_score.toFixed(1)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-zinc-800/50 p-3">
+                    <p className="text-xs uppercase tracking-wide text-zinc-400">Monthly Cost</p>
+                    <p className="mt-1 text-2xl font-bold text-red-400">
+                      ${orgMetrics.total_monthly_cost.toFixed(0)}
+                    </p>
+                  </div>
+                </div>
+
+                {orgMetrics.teams_summary.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="mb-2 text-xs uppercase tracking-wide text-zinc-400">Teams Breakdown</h4>
+                    <div className="space-y-2">
+                      {orgMetrics.teams_summary.map((teamSummary) => (
+                        <div
+                          key={teamSummary.team_id}
+                          className="flex items-center justify-between rounded-lg bg-zinc-800/50 p-2 text-sm"
+                        >
+                          <span className="font-medium text-zinc-100">{teamSummary.team_name}</span>
+                          <div className="flex items-center gap-4 text-xs text-zinc-400">
+                            <span>{teamSummary.pipeline_count} pipelines</span>
+                            <span>{formatDuration(teamSummary.avg_duration_secs)}</span>
+                            <span className="text-red-400">${teamSummary.monthly_cost.toFixed(0)}/mo</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </Panel>
+            </section>
           )}
         </main>
       </div>
