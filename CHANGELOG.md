@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-02-09
+
 ### Added
 - Runner right-sizing recommendation engine based on inferred per-job resource profiling.
 - New `pipelinex right-size` CLI command with `text` and `json` output formats.
@@ -190,6 +192,7 @@ See [GitHub Issues](https://github.com/mackeh/PipelineX/issues) for planned feat
 
 ---
 
+[1.4.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.4.0
 [1.3.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.3.0
 [1.2.1]: https://github.com/mackeh/PipelineX/releases/tag/v1.2.1
 [1.2.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.2.0
