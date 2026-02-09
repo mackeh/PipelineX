@@ -6,6 +6,8 @@ The dashboard now supports:
 - Interactive DAG visualization (D3-based pipeline explorer)
 - Trend analysis charts (duration, failure rate, and cost per run)
 - Bottleneck drilldown panels (category and job hotspots)
+- Flaky test management UI with quarantine/resolve status tracking
+- Cost center dashboard with estimated monthly waste breakdown by finding category
 - GitHub App-style PR webhook analysis and automatic PR comments
 - GitHub webhook ingestion for workflow history refresh
 - GitLab webhook ingestion for pipeline history refresh
@@ -120,6 +122,25 @@ Optional query params:
 
 - `runsPerMonth`
 - `developerHourlyRate`
+
+### `GET /api/flaky`
+
+Returns flaky-job management summary derived from history snapshots and persisted status overrides.
+
+### `POST /api/flaky`
+
+Updates flaky-job status.
+
+Request:
+
+```json
+{
+  "repo": "owner/repo",
+  "workflow": ".github/workflows/ci.yml",
+  "job_name": "e2e-tests",
+  "status": "quarantined"
+}
+```
 
 ### `GET /api/digest/weekly`
 
@@ -279,6 +300,7 @@ Custom integration scopes:
 - Benchmark registry: `.pipelinex/benchmark-registry.json`
 - Optimization impact registry: `.pipelinex/optimization-impact-registry.json`
 - Alert rules: `.pipelinex/alert-rules.json`
+- Flaky management overrides: `.pipelinex/flaky-management.json`
 - Digest email outbox: `.pipelinex/digest-email-outbox.jsonl`
 - Public API rate-limit store: `.pipelinex/public-api-rate-limits.json`
 - Public API audit log: `.pipelinex/public-api-audit.log`

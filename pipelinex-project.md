@@ -785,8 +785,8 @@ pipelinex/
 - [x] Web dashboard: overview, pipeline explorer, bottleneck drilldown
 - [x] Interactive DAG visualization (D3.js)
 - [x] Trend analysis charts (duration, failure rate, cost over time)
-- [ ] Flaky test management UI (quarantine, track, resolve)
-- [ ] Cost center dashboard with waste breakdown
+- [x] Flaky test management UI (quarantine, track, resolve)
+- [x] Cost center dashboard with waste breakdown
 - [x] Slack/Teams/email weekly digest reports
 - [x] Alert system (threshold-based: duration, failure rate, cost)
 - [ ] Bitbucket Pipelines + CircleCI parser support

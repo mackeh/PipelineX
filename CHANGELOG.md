@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Dashboard flaky-job management endpoint and persistence:
+  - `GET|POST /api/flaky`
+  - `.pipelinex/flaky-management.json` status overrides (`open`, `quarantined`, `resolved`)
+- Dashboard flaky test management UI with one-click quarantine, resolve, and reopen actions.
+- Dashboard cost center view with finding-category waste breakdown and estimated monthly opportunity cost.
+
 ## [1.4.0] - 2026-02-09
 
 ### Added
