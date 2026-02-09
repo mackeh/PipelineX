@@ -588,6 +588,7 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 | `flaky`        | Detect flaky tests                         | `pipelinex flaky test-results/*.xml`                             |
 | `history`      | Analyze workflow run history               | `pipelinex history --repo org/repo --workflow ci.yml --runs 100` |
 | `migrate`      | Migrate CI provider config                 | `pipelinex migrate .github/workflows/ci.yml --to gitlab-ci -o .gitlab-ci.yml` |
+| `multi-repo`   | Analyze cross-repo orchestration patterns  | `pipelinex multi-repo /path/to/repos --format json`              |
 | `plugins`      | Plugin scaffold/list                       | `pipelinex plugins scaffold .pipelinex/plugins.json`             |
 
 ### Output Formats
@@ -799,6 +800,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) - Docker Compose and Helm deployment
 - [docs/VS_CODE_EXTENSION.md](docs/VS_CODE_EXTENSION.md) - Inline workflow hints in VS Code
 - [docs/MIGRATION_ASSISTANT.md](docs/MIGRATION_ASSISTANT.md) - GitHub Actions to GitLab CI migration assistant
+- [docs/MULTI_REPO_ANALYSIS.md](docs/MULTI_REPO_ANALYSIS.md) - Cross-repo orchestration and monorepo risk analysis
 - [docs/PLUGINS.md](docs/PLUGINS.md) - External plugin manifest and protocol
 - [.github/workflow-templates/](.github/workflow-templates/) - GitHub Actions templates
 - [tests/fixtures/](tests/fixtures/) - Example pipelines
@@ -810,7 +812,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - **Phase 1:** ✅ Core engine, GitHub Actions parser, CLI
 - **Phase 2:** ✅ Multi-platform (8 CI systems), simulation, visualization
 - **Phase 3:** 🚧 Platform features in progress (dashboard, webhook ingestion, and team-facing APIs shipped)
-- **Phase 4:** 🚧 In progress (benchmarks, optimization impact tracking, migration assistant, public/enterprise API hardening, self-hosted deploy, REST API, VS Code extension, plugin scaffold)
+- **Phase 4:** 🚧 In progress (benchmarks, optimization impact tracking, migration assistant, multi-repo analysis, public/enterprise API hardening, self-hosted deploy, REST API, VS Code extension, plugin scaffold)
 
 ---
 
