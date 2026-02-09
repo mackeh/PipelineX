@@ -97,6 +97,24 @@ pub struct PipelineStatistics {
     pub flaky_jobs: Vec<String>,
 }
 
+/// Request body for creating a pull request
+#[derive(Debug, Serialize)]
+pub struct CreatePullRequestRequest {
+    pub title: String,
+    pub body: String,
+    pub head: String,
+    pub base: String,
+}
+
+/// Response from creating a pull request
+#[derive(Debug, Deserialize)]
+pub struct PullRequest {
+    pub number: u32,
+    pub html_url: String,
+    pub title: String,
+    pub state: String,
+}
+
 impl GitHubClient {
     /// Create a new GitHub API client
     pub fn new(token: Option<String>) -> Result<Self> {
@@ -366,6 +384,41 @@ impl GitHubClient {
 
         let sum_sq_diff: f64 = durations.iter().map(|d| (d - mean).powi(2)).sum();
         sum_sq_diff / durations.len() as f64
+    }
+
+    /// Create a pull request on GitHub
+    pub async fn create_pull_request(
+        &self,
+        owner: &str,
+        repo: &str,
+        title: &str,
+        body: &str,
+        head_branch: &str,
+        base_branch: &str,
+    ) -> Result<PullRequest> {
+        let url = format!("{}/repos/{}/{}/pulls", self.base_url, owner, repo);
+
+        let request = CreatePullRequestRequest {
+            title: title.to_string(),
+            body: body.to_string(),
+            head: head_branch.to_string(),
+            base: base_branch.to_string(),
+        };
+
+        let response: PullRequest = self
+            .client
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .context("Failed to create pull request")?
+            .error_for_status()
+            .context("GitHub API returned error when creating PR")?
+            .json()
+            .await
+            .context("Failed to parse pull request response")?;
+
+        Ok(response)
     }
 }
 

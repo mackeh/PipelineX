@@ -66,6 +66,28 @@ enum Commands {
         path: PathBuf,
     },
 
+    /// Apply optimization and create a Pull Request with optimized config
+    Apply {
+        /// Path to the workflow file to optimize
+        path: PathBuf,
+
+        /// GitHub repository (format: owner/repo, auto-detected if not provided)
+        #[arg(short, long)]
+        repo: Option<String>,
+
+        /// Base branch for PR (default: main)
+        #[arg(long, default_value = "main")]
+        base: String,
+
+        /// GitHub API token (or set GITHUB_TOKEN env var)
+        #[arg(short, long)]
+        token: Option<String>,
+
+        /// Skip PR creation and only create branch with optimized config
+        #[arg(long)]
+        no_pr: bool,
+    },
+
     /// Estimate CI/CD costs and potential savings
     Cost {
         /// Path to workflow file or directory
@@ -268,6 +290,13 @@ async fn main() -> Result<()> {
         Commands::Analyze { path, format } => cmd_analyze(&path, &format),
         Commands::Optimize { path, output, diff } => cmd_optimize(&path, output.as_deref(), diff),
         Commands::Diff { path } => cmd_diff(&path),
+        Commands::Apply {
+            path,
+            repo,
+            base,
+            token,
+            no_pr,
+        } => cmd_apply(&path, repo.as_deref(), &base, token, no_pr).await,
         Commands::Cost {
             path,
             runs_per_month,
@@ -539,6 +568,190 @@ fn cmd_optimize(path: &PathBuf, output: Option<&std::path::Path>, show_diff: boo
 
 fn cmd_diff(path: &PathBuf) -> Result<()> {
     cmd_optimize(path, None, true)
+}
+
+async fn cmd_apply(
+    path: &PathBuf,
+    repo_arg: Option<&str>,
+    base_branch: &str,
+    token: Option<String>,
+    no_pr: bool,
+) -> Result<()> {
+    use std::process::Command;
+
+    // Verify we're in a git repository
+    let git_check = Command::new("git")
+        .args(&["rev-parse", "--git-dir"])
+        .output();
+
+    if git_check.is_err() || !git_check.unwrap().status.success() {
+        anyhow::bail!("Not in a git repository. Please run this command from within a git repository.");
+    }
+
+    // Get the GitHub token
+    let github_token = token
+        .or_else(|| std::env::var("GITHUB_TOKEN").ok())
+        .context("GitHub token required. Set GITHUB_TOKEN env var or use --token")?;
+
+    // Detect repository if not provided
+    let repo_name = if let Some(r) = repo_arg {
+        r.to_string()
+    } else {
+        // Try to detect from git remote
+        let output = Command::new("git")
+            .args(&["remote", "get-url", "origin"])
+            .output()
+            .context("Failed to get git remote origin")?;
+
+        if !output.status.success() {
+            anyhow::bail!("No git remote 'origin' found. Please specify --repo owner/repo");
+        }
+
+        let remote_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+
+        // Parse GitHub URL (supports both HTTPS and SSH)
+        let repo = if let Some(captures) = regex::Regex::new(r"github\.com[:/](.+?/[^/]+?)(?:\.git)?$")
+            .unwrap()
+            .captures(&remote_url)
+        {
+            captures.get(1).unwrap().as_str().to_string()
+        } else {
+            anyhow::bail!("Could not parse GitHub repository from remote URL: {}", remote_url);
+        };
+
+        repo
+    };
+
+    println!("🔍 Analyzing pipeline: {}", path.display());
+
+    // Parse and optimize the pipeline
+    let dag = parse_pipeline(path)?;
+    let report = analyzer::analyze(&dag);
+
+    if report.findings.is_empty() {
+        println!("✅ No optimization opportunities found!");
+        return Ok(());
+    }
+
+    let optimized_content = Optimizer::optimize(path, &report)?;
+
+    // Create a new branch name
+    let filename = path.file_stem().and_then(|s| s.to_str()).unwrap_or("config");
+    let branch_name = format!("pipelinex-optimize-{}", filename);
+
+    println!("🌿 Creating branch: {}", branch_name);
+
+    // Check if branch already exists
+    let branch_exists = Command::new("git")
+        .args(&["rev-parse", "--verify", &branch_name])
+        .output()
+        .ok()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if branch_exists {
+        println!("⚠️  Branch {} already exists. Switching to it...", branch_name);
+        Command::new("git")
+            .args(&["checkout", &branch_name])
+            .status()
+            .context("Failed to checkout existing branch")?;
+    } else {
+        // Create and checkout new branch
+        Command::new("git")
+            .args(&["checkout", "-b", &branch_name])
+            .status()
+            .context("Failed to create new branch")?;
+    }
+
+    // Write optimized config
+    println!("📝 Writing optimized configuration...");
+    std::fs::write(path, &optimized_content)
+        .context("Failed to write optimized configuration")?;
+
+    // Commit changes
+    println!("💾 Committing changes...");
+    Command::new("git")
+        .args(&["add", path.to_str().unwrap()])
+        .status()
+        .context("Failed to git add")?;
+
+    let commit_msg = format!(
+        "chore: optimize {} with PipelineX\n\n\
+         Found {} optimization opportunities:\n\
+         - Estimated time savings: {:.0}%\n\
+         - Current duration: {:.0}s → Optimized: {:.0}s\n\n\
+         Generated by PipelineX (https://github.com/mackeh/PipelineX)",
+        filename,
+        report.findings.len(),
+        ((report.total_estimated_duration_secs - report.optimized_duration_secs)
+            / report.total_estimated_duration_secs * 100.0),
+        report.total_estimated_duration_secs,
+        report.optimized_duration_secs
+    );
+
+    Command::new("git")
+        .args(&["commit", "-m", &commit_msg])
+        .status()
+        .context("Failed to commit changes")?;
+
+    // Push to remote
+    println!("⬆️  Pushing to remote...");
+    Command::new("git")
+        .args(&["push", "-u", "origin", &branch_name])
+        .status()
+        .context("Failed to push branch")?;
+
+    if no_pr {
+        println!("✅ Branch created and pushed. Run with --no-pr=false to create a PR.");
+        return Ok(());
+    }
+
+    // Create pull request
+    println!("🔀 Creating pull request...");
+
+    let parts: Vec<&str> = repo_name.split('/').collect();
+    if parts.len() != 2 {
+        anyhow::bail!("Invalid repository format. Expected owner/repo, got: {}", repo_name);
+    }
+    let (owner, repo) = (parts[0], parts[1]);
+
+    let client = GitHubClient::new(Some(github_token))?;
+
+    let pr_title = format!("⚡ Optimize {} with PipelineX", filename);
+    let pr_body = format!(
+        "## Pipeline Optimization\n\n\
+         This PR optimizes `{}` to improve CI/CD performance.\n\n\
+         ### 📊 Improvements\n\n\
+         - **Findings**: {} optimization opportunities\n\
+         - **Time Savings**: {:.0}% faster\n\
+         - **Current Duration**: {:.0}s\n\
+         - **Optimized Duration**: {:.0}s\n\n\
+         ### 🔍 Key Optimizations\n\n{}\n\n\
+         ---\n\
+         Generated by [PipelineX](https://github.com/mackeh/PipelineX) — \
+         Your pipelines are slow. PipelineX knows why — and fixes them automatically.",
+        path.display(),
+        report.findings.len(),
+        ((report.total_estimated_duration_secs - report.optimized_duration_secs)
+            / report.total_estimated_duration_secs * 100.0),
+        report.total_estimated_duration_secs,
+        report.optimized_duration_secs,
+        report.findings.iter()
+            .take(5)
+            .map(|f| format!("- **{:?}**: {}", f.severity, f.title))
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+
+    let pr = client
+        .create_pull_request(owner, repo, &pr_title, &pr_body, &branch_name, base_branch)
+        .await?;
+
+    println!("\n✅ Pull request created successfully!");
+    println!("🔗 {}", pr.html_url);
+    println!("📝 PR #{}: {}", pr.number, pr.title);
+
+    Ok(())
 }
 
 fn cmd_cost(path: &Path, runs_per_month: u32, team_size: u32, hourly_rate: f64) -> Result<()> {
