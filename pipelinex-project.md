@@ -789,7 +789,7 @@ pipelinex/
 - [x] Cost center dashboard with waste breakdown
 - [x] Slack/Teams/email weekly digest reports
 - [x] Alert system (threshold-based: duration, failure rate, cost)
-- [ ] Bitbucket Pipelines + CircleCI parser support
+- [x] Bitbucket Pipelines + CircleCI parser support
 - [ ] "Apply optimization" one-click PR creation
 - [ ] Team management, org-level views
 
