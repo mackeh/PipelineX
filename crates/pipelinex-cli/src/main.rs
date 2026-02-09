@@ -5,6 +5,7 @@ use clap::{Parser, Subcommand};
 use pipelinex_core::analyzer;
 use pipelinex_core::flaky_detector::FlakyDetector;
 use pipelinex_core::github_actions_to_gitlab_ci;
+use pipelinex_core::multi_repo::{analyze_multi_repo, RepoPipeline};
 use pipelinex_core::optimizer::Optimizer;
 use pipelinex_core::parser::aws_codepipeline::AwsCodePipelineParser;
 use pipelinex_core::parser::azure::AzurePipelinesParser;
@@ -208,6 +209,17 @@ enum Commands {
         format: String,
     },
 
+    /// Analyze orchestration patterns across multiple repositories
+    MultiRepo {
+        /// Path to a root directory containing multiple repositories
+        #[arg(default_value = ".")]
+        path: PathBuf,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+
     /// External plugin management (scaffold and inspection)
     Plugins {
         #[command(subcommand)]
@@ -291,6 +303,7 @@ async fn main() -> Result<()> {
             output,
             format,
         } => cmd_migrate(&path, &to, output.as_deref(), &format),
+        Commands::MultiRepo { path, format } => cmd_multi_repo(&path, &format),
         Commands::Plugins { command } => cmd_plugins(command),
     }
 }
@@ -371,6 +384,74 @@ fn discover_workflow_files(path: &Path) -> Result<Vec<PathBuf>> {
     }
 
     anyhow::bail!("Path '{}' does not exist", path.display());
+}
+
+fn discover_repo_roots(root: &Path) -> Result<Vec<PathBuf>> {
+    if !root.exists() {
+        anyhow::bail!("Path '{}' does not exist", root.display());
+    }
+    if root.is_file() {
+        anyhow::bail!("'{}' is a file. Expected a directory.", root.display());
+    }
+
+    let mut repos = vec![root.to_path_buf()];
+    for entry in std::fs::read_dir(root)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name == ".git" || name == "target" || name == "node_modules" {
+                continue;
+            }
+            repos.push(entry.path());
+        }
+    }
+
+    repos.sort();
+    repos.dedup();
+    Ok(repos)
+}
+
+fn discover_repo_pipeline_files(repo_root: &Path) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+
+    for fixed in [
+        ".gitlab-ci.yml",
+        ".gitlab-ci.yaml",
+        "Jenkinsfile",
+        "bitbucket-pipelines.yml",
+        "bitbucket-pipelines.yaml",
+        "azure-pipelines.yml",
+        "azure-pipelines.yaml",
+        "codepipeline.json",
+        "codepipeline.yml",
+        "codepipeline.yaml",
+        "pipeline.json",
+        ".circleci/config.yml",
+        ".circleci/config.yaml",
+        ".buildkite/pipeline.yml",
+        ".buildkite/pipeline.yaml",
+    ] {
+        let path = repo_root.join(fixed);
+        if path.is_file() {
+            files.push(path);
+        }
+    }
+
+    let gh_patterns = [
+        format!("{}/.github/workflows/*.yml", repo_root.display()),
+        format!("{}/.github/workflows/*.yaml", repo_root.display()),
+    ];
+    for pattern in gh_patterns {
+        let entries = glob::glob(&pattern).context("Failed to read workflow glob pattern")?;
+        for path in entries.flatten() {
+            files.push(path);
+        }
+    }
+
+    files.sort();
+    files.dedup();
+    Ok(files)
 }
 
 fn cmd_analyze(path: &Path, format: &str) -> Result<()> {
@@ -776,6 +857,109 @@ fn cmd_migrate(
                     print!("{}", migration.yaml);
                 }
             }
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_multi_repo(path: &Path, format: &str) -> Result<()> {
+    let repo_roots = discover_repo_roots(path)?;
+
+    let mut pipelines = Vec::new();
+    let mut skipped = Vec::new();
+
+    for repo_root in repo_roots {
+        let repo_name = repo_root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(ToString::to_string)
+            .unwrap_or_else(|| repo_root.display().to_string());
+
+        let files = discover_repo_pipeline_files(&repo_root)?;
+        for file in files {
+            match parse_pipeline(&file) {
+                Ok(dag) => pipelines.push(RepoPipeline {
+                    repo: repo_name.clone(),
+                    dag,
+                }),
+                Err(error) => skipped.push((file, error.to_string())),
+            }
+        }
+    }
+
+    if pipelines.is_empty() {
+        anyhow::bail!(
+            "No CI pipeline files were found or parsed under '{}'",
+            path.display()
+        );
+    }
+
+    let report = analyze_multi_repo(&pipelines);
+
+    if format == "json" {
+        println!("{}", serde_json::to_string_pretty(&report)?);
+        return Ok(());
+    }
+
+    println!("PipelineX Multi-Repo Analysis");
+    println!(
+        "  Repositories: {}  Workflows: {}",
+        report.repo_count, report.workflow_count
+    );
+    println!(
+        "  Orchestration edges: {}",
+        report.orchestration_edges.len()
+    );
+    println!("  Findings: {}", report.findings.len());
+    println!();
+
+    println!("Repository Summary:");
+    for repo in &report.repos {
+        println!(
+            "  - {}: {} workflows, {} jobs, slowest critical path {}s",
+            repo.repo,
+            repo.workflow_count,
+            repo.total_jobs,
+            repo.max_critical_path_secs.round()
+        );
+    }
+
+    if !report.orchestration_edges.is_empty() {
+        println!();
+        println!("Detected Orchestration Edges:");
+        for edge in &report.orchestration_edges {
+            println!(
+                "  - {} -> {} ({}, confidence {:.0}%)",
+                edge.from_repo,
+                edge.to_repo,
+                edge.trigger_hint,
+                edge.confidence * 100.0
+            );
+        }
+    }
+
+    if !report.findings.is_empty() {
+        println!();
+        println!("Findings:");
+        for finding in &report.findings {
+            println!("  - [{}] {}", finding.severity.symbol(), finding.title);
+            println!("    {}", finding.description);
+            println!("    Recommendation: {}", finding.recommendation);
+        }
+    }
+
+    if !skipped.is_empty() {
+        println!();
+        println!(
+            "Skipped {} file(s) that could not be parsed as supported CI configs:",
+            skipped.len()
+        );
+        for (file, error) in skipped.iter().take(5) {
+            println!("  - {}: {}", file.display(), error);
+        }
+        if skipped.len() > 5 {
+            println!("  - ... and {} more", skipped.len() - 5);
         }
     }
 
