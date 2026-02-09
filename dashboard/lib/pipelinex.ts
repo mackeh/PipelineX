@@ -1,5 +1,6 @@
 import { constants } from "node:fs";
-import { access, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -417,6 +418,45 @@ export async function analyzePipelineFile(inputPath: string): Promise<AnalysisRe
         error instanceof Error ? error.message : "Unknown parse error"
       }\nOutput preview:\n${preview}`,
     );
+  }
+}
+
+export async function analyzePipelineContent(
+  sourcePath: string,
+  content: string,
+): Promise<AnalysisReport> {
+  if (!sourcePath || sourcePath.trim().length === 0) {
+    throw new Error("sourcePath is required.");
+  }
+  if (typeof content !== "string" || content.trim().length === 0) {
+    throw new Error("content is required.");
+  }
+
+  const extension = path.extname(sourcePath) || ".yml";
+  const tempDir = await mkdtemp(path.join(tmpdir(), "pipelinex-pr-analysis-"));
+  const tempPath = path.join(tempDir, `workflow${extension}`);
+
+  try {
+    await writeFile(tempPath, content, "utf8");
+    const stdout = await runPipelinexJsonCommand([
+      "analyze",
+      tempPath,
+      "--format",
+      "json",
+    ]);
+
+    try {
+      return JSON.parse(stdout) as AnalysisReport;
+    } catch (error) {
+      const preview = stdout.slice(0, 4000);
+      throw new Error(
+        `Failed to parse analyzer JSON output: ${
+          error instanceof Error ? error.message : "Unknown parse error"
+        }\nOutput preview:\n${preview}`,
+      );
+    }
+  } finally {
+    await rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
   }
 }
 
