@@ -3,6 +3,7 @@ pub mod cost;
 pub mod flaky_detector;
 pub mod graph;
 pub mod health_score;
+pub mod migration;
 pub mod optimizer;
 pub mod parser;
 pub mod plugins;
@@ -12,6 +13,7 @@ pub mod test_selector;
 
 pub use analyzer::report::{AnalysisReport, Finding, Severity};
 pub use flaky_detector::{FlakyCategory, FlakyDetector, FlakyReport, FlakyTest};
+pub use migration::{github_actions_to_gitlab_ci, MigrationResult};
 pub use optimizer::Optimizer;
 pub use parser::aws_codepipeline::AwsCodePipelineParser;
 pub use parser::azure::AzurePipelinesParser;
