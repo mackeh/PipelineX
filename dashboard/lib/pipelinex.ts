@@ -2354,13 +2354,13 @@ export async function calculateOrgLevelMetrics(): Promise<OrgLevelMetrics> {
     // Calculate metrics from history snapshots for this team's pipelines
     const teamSnapshots = historySnapshots.filter((snapshot) =>
       teamPipelines.some((pipeline) =>
-        snapshot.workflow_identifier.includes(pipeline),
+        snapshot.workflow.includes(pipeline),
       ),
     );
 
     if (teamSnapshots.length > 0) {
       const totalDuration = teamSnapshots.reduce(
-        (sum, s) => sum + s.avg_duration_sec,
+        (sum, s) => sum + s.stats.avg_duration_sec,
         0,
       );
       teamMetrics.avg_duration_secs = totalDuration / teamSnapshots.length;
