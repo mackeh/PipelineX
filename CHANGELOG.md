@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New `pipelinex right-size` CLI command with `text` and `json` output formats.
 - Dashboard API endpoint `POST /api/gitlab/webhook` for GitLab pipeline webhook ingestion.
 - Webhook cache panel now explicitly supports both GitHub and GitLab event-driven refreshes.
+- Dashboard alerting endpoints for threshold-based duration/failure/cost evaluation:
+  - `GET|POST|DELETE /api/alerts`
+  - `GET /api/alerts/evaluate`
 
 ### Changed
 - `analyze` now emits runner right-sizing findings in optimization reports.

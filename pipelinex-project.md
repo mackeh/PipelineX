@@ -788,7 +788,7 @@ pipelinex/
 - [ ] Flaky test management UI (quarantine, track, resolve)
 - [ ] Cost center dashboard with waste breakdown
 - [ ] Slack/Teams/email weekly digest reports
-- [ ] Alert system (threshold-based: duration, failure rate, cost)
+- [x] Alert system (threshold-based: duration, failure rate, cost)
 - [ ] Bitbucket Pipelines + CircleCI parser support
 - [ ] "Apply optimization" one-click PR creation
 - [ ] Team management, org-level views

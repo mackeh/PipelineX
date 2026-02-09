@@ -74,6 +74,39 @@ Request:
 }
 ```
 
+### `GET /api/alerts`
+
+Returns configured alert rules persisted in local store.
+
+### `POST /api/alerts`
+
+Creates or updates a threshold-based alert rule.
+
+Request:
+
+```json
+{
+  "name": "Duration over 20 minutes",
+  "metric": "avg_duration_sec",
+  "operator": "gte",
+  "threshold": 1200,
+  "provider": "github-actions"
+}
+```
+
+### `DELETE /api/alerts?id=<rule-id>`
+
+Deletes an alert rule by id.
+
+### `GET /api/alerts/evaluate`
+
+Evaluates enabled rules against cached history snapshots and returns active triggers.
+
+Optional query params:
+
+- `runsPerMonth`
+- `developerHourlyRate`
+
 ### `POST /api/benchmarks/submit`
 
 Stores anonymized benchmark metrics derived from an analysis report and returns cohort stats.
@@ -175,6 +208,8 @@ Custom integration scopes:
 - `GITLAB_WEBHOOK_TOKEN` or `GITLAB_WEBHOOK_SECRET_TOKEN`: optional shared token validation for GitLab webhooks.
 - `PIPELINEX_GITLAB_WORKFLOW_PATH`: optional workflow identifier stored for GitLab snapshots (default `.gitlab-ci.yml`).
 - `PIPELINEX_HISTORY_RUNS`: optional lookback window for webhook-triggered refreshes (default `100`).
+- `PIPELINEX_ALERT_RUNS_PER_MONTH`: default runs/month used in cost-based alert evaluation.
+- `PIPELINEX_ALERT_DEVELOPER_HOURLY_RATE`: default developer hourly rate used in cost-based alert evaluation.
 - `PIPELINEX_API_KEY`: single-key public API mode.
 - `PIPELINEX_API_KEY_ROLES`: CSV roles for the single-key public API mode.
 - `PIPELINEX_API_KEYS`: JSON array of key configs (supports rotation fields).
@@ -193,6 +228,7 @@ Custom integration scopes:
 - History cache: `.pipelinex/history-cache/`
 - Benchmark registry: `.pipelinex/benchmark-registry.json`
 - Optimization impact registry: `.pipelinex/optimization-impact-registry.json`
+- Alert rules: `.pipelinex/alert-rules.json`
 - Public API rate-limit store: `.pipelinex/public-api-rate-limits.json`
 - Public API audit log: `.pipelinex/public-api-audit.log`
 
