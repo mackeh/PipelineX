@@ -27,6 +27,8 @@ import {
   YAxis,
 } from "recharts";
 import type {
+  AlertEvaluationSummary,
+  AlertRule,
   AnalysisReport,
   BenchmarkEntry,
   BenchmarkStats,
@@ -57,6 +59,16 @@ type BenchmarkSubmitResponse = {
 
 type BenchmarkStatsResponse = {
   stats?: BenchmarkStats;
+  error?: string;
+};
+
+type AlertsResponse = {
+  rules?: AlertRule[];
+  error?: string;
+};
+
+type AlertEvaluateResponse = {
+  summary?: AlertEvaluationSummary;
   error?: string;
 };
 
@@ -94,6 +106,9 @@ export default function DashboardPage() {
   const [runningAnalysis, setRunningAnalysis] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historySnapshots, setHistorySnapshots] = useState<HistorySnapshot[]>([]);
+  const [loadingAlerts, setLoadingAlerts] = useState(false);
+  const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
+  const [alertSummary, setAlertSummary] = useState<AlertEvaluationSummary | null>(null);
   const [benchmarkStats, setBenchmarkStats] = useState<BenchmarkStats | null>(null);
   const [benchmarkSubmitting, setBenchmarkSubmitting] = useState(false);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
@@ -216,6 +231,37 @@ export default function DashboardPage() {
     }
   }, []);
 
+  const loadAlerts = useCallback(async () => {
+    setLoadingAlerts(true);
+    try {
+      const [rulesResponse, summaryResponse] = await Promise.all([
+        fetch("/api/alerts"),
+        fetch("/api/alerts/evaluate"),
+      ]);
+
+      const rulesPayload = (await rulesResponse.json()) as AlertsResponse;
+      if (!rulesResponse.ok || !rulesPayload.rules) {
+        throw new Error(rulesPayload.error || "Failed to load alert rules.");
+      }
+
+      const summaryPayload = (await summaryResponse.json()) as AlertEvaluateResponse;
+      if (!summaryResponse.ok || !summaryPayload.summary) {
+        throw new Error(summaryPayload.error || "Failed to evaluate alert rules.");
+      }
+
+      setAlertRules(rulesPayload.rules);
+      setAlertSummary(summaryPayload.summary);
+    } catch (alertsError) {
+      setError(
+        alertsError instanceof Error
+          ? alertsError.message
+          : "Failed to load alerting state.",
+      );
+    } finally {
+      setLoadingAlerts(false);
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -256,11 +302,12 @@ export default function DashboardPage() {
 
     void loadWorkflows();
     void loadHistorySnapshots();
+    void loadAlerts();
 
     return () => {
       mounted = false;
     };
-  }, [loadHistorySnapshots, runAnalysis]);
+  }, [loadAlerts, loadHistorySnapshots, runAnalysis]);
 
   const severityCounts = useMemo(() => {
     const counts = {
@@ -642,6 +689,89 @@ export default function DashboardPage() {
                       </p>
                     )}
                   </div>
+                </Panel>
+              </section>
+
+              <section className="mt-5">
+                <Panel title="Alert System (Threshold-Based)">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm text-zinc-400">
+                      Alert rules evaluate duration, failure rate, and opportunity-cost thresholds.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void loadAlerts()}
+                      className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-zinc-200 transition hover:border-cyan-400 hover:text-cyan-200"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${loadingAlerts ? "animate-spin" : ""}`} />
+                      Evaluate
+                    </button>
+                  </div>
+
+                  {alertSummary && (
+                    <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-4">
+                      <BenchmarkTile
+                        label="Rules"
+                        value={String(alertSummary.total_rules)}
+                        sublabel={`${alertSummary.enabled_rules} enabled`}
+                        icon={Wrench}
+                      />
+                      <BenchmarkTile
+                        label="Snapshots"
+                        value={String(alertSummary.snapshots_considered)}
+                        sublabel="history cache inputs"
+                        icon={Workflow}
+                      />
+                      <BenchmarkTile
+                        label="Triggered"
+                        value={String(alertSummary.triggered_count)}
+                        sublabel="active threshold breaches"
+                        icon={AlertTriangle}
+                      />
+                      <BenchmarkTile
+                        label="Defaults"
+                        value={`${alertSummary.default_runs_per_month}/mo`}
+                        sublabel={`$${alertSummary.default_developer_hourly_rate}/hr`}
+                        icon={Clock3}
+                      />
+                    </div>
+                  )}
+
+                  {alertSummary && alertSummary.triggers.length > 0 ? (
+                    <div className="space-y-2">
+                      {alertSummary.triggers.slice(0, 6).map((trigger) => (
+                        <article
+                          key={`${trigger.rule_id}-${trigger.repo}-${trigger.workflow}`}
+                          className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-zinc-100">{trigger.rule_name}</p>
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                trigger.severity === "critical"
+                                  ? "bg-red-500/20 text-red-200"
+                                  : trigger.severity === "high"
+                                    ? "bg-amber-500/20 text-amber-200"
+                                    : "bg-sky-500/20 text-sky-200"
+                              }`}
+                            >
+                              {trigger.severity}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-zinc-300">{trigger.message}</p>
+                          <p className="mt-1 text-xs text-zinc-400">
+                            {trigger.repo} • {trigger.workflow} • {trigger.provider}
+                          </p>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-zinc-400">
+                      {alertRules.length === 0
+                        ? "No alert rules configured yet. Use POST /api/alerts to add threshold rules."
+                        : "No threshold breaches detected in current snapshot cache."}
+                    </p>
+                  )}
                 </Panel>
               </section>
             </>

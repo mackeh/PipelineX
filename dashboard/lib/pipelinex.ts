@@ -70,6 +70,7 @@ export interface PipelineStatistics {
 export interface HistorySnapshot {
   repo: string;
   workflow: string;
+  provider?: string;
   runs: number;
   refreshed_at: string;
   source: "manual" | "webhook";
@@ -139,11 +140,71 @@ export interface OptimizationImpactStats {
   total_hours_saved_per_month: number;
 }
 
+export type AlertMetric =
+  | "avg_duration_sec"
+  | "failure_rate_pct"
+  | "monthly_opportunity_cost_usd";
+
+export type AlertOperator = "gt" | "gte" | "lt" | "lte";
+
+export interface AlertRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  metric: AlertMetric;
+  operator: AlertOperator;
+  threshold: number;
+  repo?: string;
+  workflow?: string;
+  provider?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AlertRuleInput {
+  id?: string;
+  name: string;
+  enabled?: boolean;
+  metric: AlertMetric;
+  operator: AlertOperator;
+  threshold: number;
+  repo?: string;
+  workflow?: string;
+  provider?: string;
+}
+
+export interface AlertTrigger {
+  rule_id: string;
+  rule_name: string;
+  metric: AlertMetric;
+  operator: AlertOperator;
+  threshold: number;
+  actual_value: number;
+  repo: string;
+  workflow: string;
+  provider: string;
+  severity: "medium" | "high" | "critical";
+  message: string;
+  evaluated_at: string;
+}
+
+export interface AlertEvaluationSummary {
+  evaluated_at: string;
+  default_runs_per_month: number;
+  default_developer_hourly_rate: number;
+  total_rules: number;
+  enabled_rules: number;
+  snapshots_considered: number;
+  triggered_count: number;
+  triggers: AlertTrigger[];
+}
+
 const PIPELINE_EXTENSIONS = [".yml", ".yaml", ".groovy", ".jenkinsfile"];
 const SEARCH_ROOTS = [".github/workflows", "tests/fixtures"];
 const HISTORY_CACHE_RELATIVE_DIR = ".pipelinex/history-cache";
 const BENCHMARK_REGISTRY_RELATIVE_PATH = ".pipelinex/benchmark-registry.json";
 const IMPACT_REGISTRY_RELATIVE_PATH = ".pipelinex/optimization-impact-registry.json";
+const ALERT_RULES_RELATIVE_PATH = ".pipelinex/alert-rules.json";
 
 function pathExists(filePath: string): Promise<boolean> {
   return access(filePath, constants.F_OK)
@@ -478,6 +539,7 @@ interface RefreshHistoryOptions {
 interface StoreHistorySnapshotOptions {
   repo: string;
   workflow: string;
+  provider?: string;
   runs?: number;
   source?: "manual" | "webhook";
   stats: PipelineStatistics;
@@ -495,6 +557,7 @@ export async function storeHistorySnapshot(
   const snapshot: HistorySnapshot = {
     repo: options.repo,
     workflow,
+    provider: options.provider?.trim() || undefined,
     runs,
     refreshed_at: new Date().toISOString(),
     source: options.source ?? "manual",
@@ -548,6 +611,7 @@ export async function refreshHistorySnapshot(
   const snapshot: HistorySnapshot = {
     repo: options.repo,
     workflow,
+    provider: "github-actions",
     runs,
     refreshed_at: new Date().toISOString(),
     source: options.source ?? "manual",
@@ -954,5 +1018,324 @@ export async function queryOptimizationImpactStats(
     p75_minutes_saved_per_month: percentile(minutesValues, 75),
     total_minutes_saved_per_month: totalMinutes,
     total_hours_saved_per_month: totalMinutes / 60,
+  };
+}
+
+function alertRulesPath(repoRoot: string): string {
+  return path.join(repoRoot, ALERT_RULES_RELATIVE_PATH);
+}
+
+function normalizeOptionalText(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized && normalized.length > 0 ? normalized : undefined;
+}
+
+function isAlertMetric(value: unknown): value is AlertMetric {
+  return (
+    value === "avg_duration_sec" ||
+    value === "failure_rate_pct" ||
+    value === "monthly_opportunity_cost_usd"
+  );
+}
+
+function isAlertOperator(value: unknown): value is AlertOperator {
+  return value === "gt" || value === "gte" || value === "lt" || value === "lte";
+}
+
+function validateAlertRuleInput(input: AlertRuleInput): AlertRuleInput {
+  if (!input.name || input.name.trim().length === 0) {
+    throw new Error("Alert rule name is required.");
+  }
+  if (!isAlertMetric(input.metric)) {
+    throw new Error("Alert rule metric is invalid.");
+  }
+  if (!isAlertOperator(input.operator)) {
+    throw new Error("Alert rule operator is invalid.");
+  }
+  if (!Number.isFinite(input.threshold)) {
+    throw new Error("Alert rule threshold must be a finite number.");
+  }
+
+  return {
+    ...input,
+    name: input.name.trim(),
+    enabled: input.enabled ?? true,
+    threshold: Number(input.threshold),
+    repo: normalizeOptionalText(input.repo),
+    workflow: normalizeOptionalText(input.workflow),
+    provider: normalizeOptionalText(input.provider),
+  };
+}
+
+async function readAlertRules(): Promise<AlertRule[]> {
+  const repoRoot = await getRepoRoot();
+  const filePath = alertRulesPath(repoRoot);
+
+  if (!(await pathExists(filePath))) {
+    return [];
+  }
+
+  const raw = await readFile(filePath, "utf8");
+  if (!raw.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as AlertRule[];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter(
+      (rule) =>
+        typeof rule?.id === "string" &&
+        typeof rule?.name === "string" &&
+        typeof rule?.enabled === "boolean" &&
+        isAlertMetric(rule?.metric) &&
+        isAlertOperator(rule?.operator) &&
+        typeof rule?.threshold === "number",
+    );
+  } catch {
+    return [];
+  }
+}
+
+async function writeAlertRules(rules: AlertRule[]): Promise<void> {
+  const repoRoot = await getRepoRoot();
+  const filePath = alertRulesPath(repoRoot);
+  const parentDir = path.dirname(filePath);
+  await mkdir(parentDir, { recursive: true });
+  await writeFile(filePath, JSON.stringify(rules, null, 2), "utf8");
+}
+
+export async function listAlertRules(): Promise<AlertRule[]> {
+  const rules = await readAlertRules();
+  return rules.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+}
+
+export async function upsertAlertRule(input: AlertRuleInput): Promise<AlertRule> {
+  const normalized = validateAlertRuleInput(input);
+  const rules = await readAlertRules();
+  const now = new Date().toISOString();
+
+  if (normalized.id) {
+    const index = rules.findIndex((rule) => rule.id === normalized.id);
+    if (index >= 0) {
+      const existing = rules[index];
+      const updated: AlertRule = {
+        ...existing,
+        ...normalized,
+        id: existing.id,
+        created_at: existing.created_at,
+        updated_at: now,
+      };
+      rules[index] = updated;
+      await writeAlertRules(rules);
+      return updated;
+    }
+  }
+
+  const created: AlertRule = {
+    id: randomUUID(),
+    name: normalized.name,
+    enabled: normalized.enabled ?? true,
+    metric: normalized.metric,
+    operator: normalized.operator,
+    threshold: normalized.threshold,
+    repo: normalized.repo,
+    workflow: normalized.workflow,
+    provider: normalized.provider,
+    created_at: now,
+    updated_at: now,
+  };
+  rules.push(created);
+  await writeAlertRules(rules);
+  return created;
+}
+
+export async function deleteAlertRule(id: string): Promise<boolean> {
+  const normalized = id.trim();
+  if (!normalized) {
+    throw new Error("Alert rule id is required.");
+  }
+
+  const rules = await readAlertRules();
+  const retained = rules.filter((rule) => rule.id !== normalized);
+  if (retained.length === rules.length) {
+    return false;
+  }
+
+  await writeAlertRules(retained);
+  return true;
+}
+
+function compareNumeric(operator: AlertOperator, left: number, right: number): boolean {
+  switch (operator) {
+    case "gt":
+      return left > right;
+    case "gte":
+      return left >= right;
+    case "lt":
+      return left < right;
+    case "lte":
+      return left <= right;
+    default:
+      return false;
+  }
+}
+
+function inferProviderFromSnapshot(snapshot: HistorySnapshot): string {
+  if (snapshot.provider && snapshot.provider.trim().length > 0) {
+    return snapshot.provider.trim();
+  }
+  const workflowLower = snapshot.workflow.toLowerCase();
+  if (workflowLower.includes(".gitlab-ci")) {
+    return "gitlab-ci";
+  }
+  return "github-actions";
+}
+
+function resolveAlertDefaults(
+  runsPerMonth: number | undefined,
+  developerHourlyRate: number | undefined,
+): { runsPerMonth: number; developerHourlyRate: number } {
+  const runsFromEnv = Number.parseInt(
+    process.env.PIPELINEX_ALERT_RUNS_PER_MONTH?.trim() || "",
+    10,
+  );
+  const rateFromEnv = Number.parseFloat(
+    process.env.PIPELINEX_ALERT_DEVELOPER_HOURLY_RATE?.trim() || "",
+  );
+
+  return {
+    runsPerMonth:
+      typeof runsPerMonth === "number" && Number.isFinite(runsPerMonth) && runsPerMonth > 0
+        ? Math.floor(runsPerMonth)
+        : Number.isFinite(runsFromEnv) && runsFromEnv > 0
+          ? runsFromEnv
+          : 500,
+    developerHourlyRate:
+      typeof developerHourlyRate === "number" &&
+      Number.isFinite(developerHourlyRate) &&
+      developerHourlyRate > 0
+        ? developerHourlyRate
+        : Number.isFinite(rateFromEnv) && rateFromEnv > 0
+          ? rateFromEnv
+          : 150,
+  };
+}
+
+function metricValueForSnapshot(
+  rule: AlertRule,
+  snapshot: HistorySnapshot,
+  defaults: { runsPerMonth: number; developerHourlyRate: number },
+): number {
+  switch (rule.metric) {
+    case "avg_duration_sec":
+      return snapshot.stats.avg_duration_sec;
+    case "failure_rate_pct":
+      return Math.max(0, (1 - snapshot.stats.success_rate) * 100);
+    case "monthly_opportunity_cost_usd": {
+      const monthlyHoursLost =
+        (snapshot.stats.avg_duration_sec * defaults.runsPerMonth) / 3600;
+      return monthlyHoursLost * defaults.developerHourlyRate;
+    }
+    default:
+      return 0;
+  }
+}
+
+function triggerSeverity(
+  operator: AlertOperator,
+  actual: number,
+  threshold: number,
+): "medium" | "high" | "critical" {
+  const safeThreshold = Math.max(Math.abs(threshold), 1e-6);
+  const ratio =
+    operator === "lt" || operator === "lte"
+      ? safeThreshold / Math.max(Math.abs(actual), 1e-6)
+      : Math.abs(actual) / safeThreshold;
+  if (ratio >= 1.5) {
+    return "critical";
+  }
+  if (ratio >= 1.2) {
+    return "high";
+  }
+  return "medium";
+}
+
+function snapshotMatchesRule(rule: AlertRule, snapshot: HistorySnapshot): boolean {
+  const provider = inferProviderFromSnapshot(snapshot);
+  if (rule.repo && rule.repo !== snapshot.repo) {
+    return false;
+  }
+  if (rule.workflow && rule.workflow !== snapshot.workflow) {
+    return false;
+  }
+  if (rule.provider && rule.provider !== provider) {
+    return false;
+  }
+  return true;
+}
+
+interface EvaluateAlertRulesOptions {
+  runsPerMonth?: number;
+  developerHourlyRate?: number;
+}
+
+export async function evaluateAlertRules(
+  options: EvaluateAlertRulesOptions = {},
+): Promise<AlertEvaluationSummary> {
+  const defaults = resolveAlertDefaults(options.runsPerMonth, options.developerHourlyRate);
+  const rules = await listAlertRules();
+  const snapshots = await listHistorySnapshots();
+  const enabledRules = rules.filter((rule) => rule.enabled);
+  const triggers: AlertTrigger[] = [];
+
+  for (const rule of enabledRules) {
+    const snapshot = snapshots.find((candidate) => snapshotMatchesRule(rule, candidate));
+    if (!snapshot) {
+      continue;
+    }
+
+    const actualValue = metricValueForSnapshot(rule, snapshot, defaults);
+    const matched = compareNumeric(rule.operator, actualValue, rule.threshold);
+    if (!matched) {
+      continue;
+    }
+
+    const provider = inferProviderFromSnapshot(snapshot);
+    const evaluatedAt = new Date().toISOString();
+    triggers.push({
+      rule_id: rule.id,
+      rule_name: rule.name,
+      metric: rule.metric,
+      operator: rule.operator,
+      threshold: rule.threshold,
+      actual_value: actualValue,
+      repo: snapshot.repo,
+      workflow: snapshot.workflow,
+      provider,
+      severity: triggerSeverity(rule.operator, actualValue, rule.threshold),
+      message: `${rule.name} triggered for ${snapshot.repo} (${rule.metric} ${rule.operator} ${rule.threshold}, actual ${actualValue.toFixed(2)})`,
+      evaluated_at: evaluatedAt,
+    });
+  }
+
+  triggers.sort((a, b) => {
+    const severityRank = (value: AlertTrigger["severity"]): number =>
+      value === "critical" ? 3 : value === "high" ? 2 : 1;
+    return severityRank(b.severity) - severityRank(a.severity);
+  });
+
+  return {
+    evaluated_at: new Date().toISOString(),
+    default_runs_per_month: defaults.runsPerMonth,
+    default_developer_hourly_rate: defaults.developerHourlyRate,
+    total_rules: rules.length,
+    enabled_rules: enabledRules.length,
+    snapshots_considered: snapshots.length,
+    triggered_count: triggers.length,
+    triggers,
   };
 }
