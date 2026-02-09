@@ -3,6 +3,7 @@ pub mod critical_path;
 pub mod html_report;
 pub mod parallel_finder;
 pub mod report;
+pub mod runner_sizer;
 pub mod sarif;
 pub mod waste_detector;
 
@@ -29,6 +30,9 @@ pub fn analyze(dag: &PipelineDag) -> AnalysisReport {
 
     // Waste detection
     findings.extend(waste_detector::detect_waste(dag));
+
+    // Runner right-sizing recommendations
+    findings.extend(runner_sizer::detect_runner_right_sizing(dag));
 
     // Optional external analyzer plugins (manifest-driven).
     findings.extend(crate::plugins::run_external_analyzer_plugins(dag));

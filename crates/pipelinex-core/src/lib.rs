@@ -9,6 +9,7 @@ pub mod optimizer;
 pub mod parser;
 pub mod plugins;
 pub mod providers;
+pub mod runner_sizing;
 pub mod simulator;
 pub mod test_selector;
 
@@ -29,4 +30,5 @@ pub use parser::jenkins::JenkinsParser;
 pub use plugins::{
     list_external_optimizer_plugins, run_external_analyzer_plugins, scaffold_manifest,
 };
+pub use runner_sizing::{profile_pipeline as profile_runner_sizing, RunnerSizingReport};
 pub use test_selector::{TestSelection, TestSelector, TestSelectorConfig};

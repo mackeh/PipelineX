@@ -300,6 +300,7 @@ fn plugin_finding_to_core(plugin: &ExternalAnalyzerPlugin, finding: PluginFindin
         "flakytest" | "flaky_test" => FindingCategory::FlakyTest,
         "concurrencycontrol" | "concurrency_control" => FindingCategory::ConcurrencyControl,
         "artifactreuse" | "artifact_reuse" => FindingCategory::ArtifactReuse,
+        "runnersizing" | "runner_sizing" | "right_sizing" => FindingCategory::RunnerSizing,
         _ => FindingCategory::CustomPlugin,
     };
 
