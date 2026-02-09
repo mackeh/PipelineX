@@ -16,6 +16,7 @@ use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
 use pipelinex_core::parser::jenkins::JenkinsParser;
 use pipelinex_core::plugins;
+use pipelinex_core::profile_runner_sizing;
 use pipelinex_core::providers::GitHubClient;
 use pipelinex_core::test_selector::TestSelector;
 use std::path::{Path, PathBuf};
@@ -220,6 +221,17 @@ enum Commands {
         format: String,
     },
 
+    /// Recommend right-sized runners based on inferred resource pressure
+    RightSize {
+        /// Path to workflow file or directory containing workflow files
+        #[arg(default_value = ".github/workflows/")]
+        path: PathBuf,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+
     /// External plugin management (scaffold and inspection)
     Plugins {
         #[command(subcommand)]
@@ -304,6 +316,7 @@ async fn main() -> Result<()> {
             format,
         } => cmd_migrate(&path, &to, output.as_deref(), &format),
         Commands::MultiRepo { path, format } => cmd_multi_repo(&path, &format),
+        Commands::RightSize { path, format } => cmd_right_size(&path, &format),
         Commands::Plugins { command } => cmd_plugins(command),
     }
 }
@@ -961,6 +974,40 @@ fn cmd_multi_repo(path: &Path, format: &str) -> Result<()> {
         if skipped.len() > 5 {
             println!("  - ... and {} more", skipped.len() - 5);
         }
+    }
+
+    Ok(())
+}
+
+fn cmd_right_size(path: &Path, format: &str) -> Result<()> {
+    let files = discover_workflow_files(path)?;
+    if files.is_empty() {
+        anyhow::bail!("No workflow files found at '{}'", path.display());
+    }
+
+    #[derive(serde::Serialize)]
+    struct Output {
+        source_file: String,
+        report: pipelinex_core::RunnerSizingReport,
+    }
+
+    let mut outputs = Vec::new();
+    for file in &files {
+        let dag = parse_pipeline(file)?;
+        let report = profile_runner_sizing(&dag);
+        outputs.push(Output {
+            source_file: file.display().to_string(),
+            report,
+        });
+    }
+
+    if format == "json" {
+        println!("{}", serde_json::to_string_pretty(&outputs)?);
+        return Ok(());
+    }
+
+    for output in &outputs {
+        display::print_runner_sizing_report(Path::new(&output.source_file), &output.report);
     }
 
     Ok(())

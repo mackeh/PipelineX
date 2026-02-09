@@ -98,6 +98,11 @@ fn profile_job(job: &JobNode) -> JobRunnerRecommendation {
             if contains_any(
                 &text,
                 &[
+                    "npm run build",
+                    "npm test",
+                    "pnpm test",
+                    "yarn test",
+                    "pytest",
                     "cargo build",
                     "cargo test",
                     "go build",
@@ -187,7 +192,8 @@ fn profile_job(job: &JobNode) -> JobRunnerRecommendation {
     }
 
     let current_class = classify_current_runner(&job.runs_on);
-    let recommended_class = classify_recommended_runner(cpu, memory, io);
+    let recommended_class =
+        classify_recommended_runner(cpu, memory, io, job.estimated_duration_secs);
     let confidence = estimate_confidence(cpu, memory, io, rationale.len());
 
     let mut deduped_rationale = Vec::new();
@@ -228,9 +234,9 @@ fn classify_current_runner(runs_on: &str) -> RunnerSizeClass {
     }
 }
 
-fn classify_recommended_runner(cpu: u8, memory: u8, io: u8) -> RunnerSizeClass {
+fn classify_recommended_runner(cpu: u8, memory: u8, io: u8, duration_secs: f64) -> RunnerSizeClass {
     let max_pressure = cpu.max(memory).max(io);
-    if max_pressure >= 8 || (cpu >= 7 && memory >= 6) {
+    let mut recommended = if max_pressure >= 8 || (cpu >= 7 && memory >= 6) {
         RunnerSizeClass::XLarge
     } else if max_pressure >= 5 || (cpu >= 4 && memory >= 4) {
         RunnerSizeClass::Large
@@ -238,7 +244,13 @@ fn classify_recommended_runner(cpu: u8, memory: u8, io: u8) -> RunnerSizeClass {
         RunnerSizeClass::Small
     } else {
         RunnerSizeClass::Medium
+    };
+
+    // Avoid aggressive downsizing for jobs that are already long-running.
+    if duration_secs >= 10.0 * 60.0 && recommended == RunnerSizeClass::Small {
+        recommended = RunnerSizeClass::Medium;
     }
+    recommended
 }
 
 fn estimate_confidence(cpu: u8, memory: u8, io: u8, reasons: usize) -> f64 {

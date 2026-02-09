@@ -3,6 +3,7 @@ use pipelinex_core::analyzer::report::{format_duration, AnalysisReport, Finding,
 use pipelinex_core::cost::CostEstimate;
 use pipelinex_core::flaky_detector::{FlakyCategory, FlakyReport};
 use pipelinex_core::optimizer::docker_opt::{DockerAnalysis, DockerSeverity};
+use pipelinex_core::runner_sizing::{RunnerSizeClass, RunnerSizingReport};
 use pipelinex_core::simulator::SimulationResult;
 use pipelinex_core::test_selector::TestSelection;
 use similar::{ChangeTag, TextDiff};
@@ -722,6 +723,112 @@ pub fn print_flaky_report(report: &FlakyReport, files: &[PathBuf]) {
         "|".dimmed()
     );
     println!();
+}
+
+/// Print runner right-sizing recommendations.
+pub fn print_runner_sizing_report(source: &Path, report: &RunnerSizingReport) {
+    println!();
+    println!(
+        "{}",
+        format!(" PipelineX Runner Sizing — {}", source.display()).bold()
+    );
+    println!();
+
+    println!(" {}", "Summary".bold().underline());
+    println!(" {} Provider: {}", "|-".dimmed(), report.provider.cyan());
+    println!(" {} Jobs analyzed: {}", "|-".dimmed(), report.total_jobs);
+    println!(
+        " {} Upsize recommendations: {}",
+        "|-".dimmed(),
+        if report.upsizing_jobs > 0 {
+            report.upsizing_jobs.to_string().yellow().bold().to_string()
+        } else {
+            "0".to_string()
+        }
+    );
+    println!(
+        " {} Downsize recommendations: {}",
+        "|-".dimmed(),
+        if report.downsizing_jobs > 0 {
+            report.downsizing_jobs.to_string().blue().bold().to_string()
+        } else {
+            "0".to_string()
+        }
+    );
+    println!(
+        " {} Unchanged jobs: {}",
+        "|-".dimmed(),
+        report.unchanged_jobs
+    );
+    println!();
+
+    let actionable = report
+        .jobs
+        .iter()
+        .filter(|job| job.current_class != job.recommended_class)
+        .collect::<Vec<_>>();
+
+    if actionable.is_empty() {
+        println!(
+            " {} No runner resizing changes recommended.",
+            "OK".green().bold()
+        );
+        println!();
+        return;
+    }
+
+    println!(" {}", "=".repeat(60).dimmed());
+    println!();
+
+    for job in actionable {
+        let direction = if rank(job.recommended_class) > rank(job.current_class) {
+            "UPSCALE".on_yellow().black().bold().to_string()
+        } else {
+            "DOWNSIZE".on_blue().white().bold().to_string()
+        };
+
+        println!(" {} {}", direction, job.job_id.bold());
+        println!(
+            "   {} {} -> {} ({})",
+            "|".dimmed(),
+            job.current_class.as_str(),
+            job.recommended_class.as_str(),
+            job.current_runner
+        );
+        println!(
+            "   {} Pressure cpu={} mem={} io={} | Duration {} | Confidence {:.0}%",
+            "|".dimmed(),
+            job.cpu_pressure,
+            job.memory_pressure,
+            job.io_pressure,
+            format_duration(job.duration_secs),
+            job.confidence * 100.0
+        );
+        if !job.rationale.is_empty() {
+            println!("   {} {}", "|".dimmed(), job.rationale[0]);
+            for reason in job.rationale.iter().skip(1).take(2) {
+                println!("   {} {}", "|".dimmed(), reason.dimmed());
+            }
+        }
+        println!();
+    }
+
+    println!(" {}", "=".repeat(60).dimmed());
+    println!();
+    println!(
+        " {} Validate on historical runs before enforcing globally.",
+        "Tip".green().bold()
+    );
+    println!();
+}
+
+fn rank(class: RunnerSizeClass) -> u8 {
+    match class {
+        RunnerSizeClass::Small => 0,
+        RunnerSizeClass::Medium => 1,
+        RunnerSizeClass::Large => 2,
+        RunnerSizeClass::XLarge => 3,
+    }
 }
 
 use pipelinex_core::providers::github_api::PipelineStatistics;
