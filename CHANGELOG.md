@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard alerting endpoints for threshold-based duration/failure/cost evaluation:
   - `GET|POST|DELETE /api/alerts`
   - `GET /api/alerts/evaluate`
+- Dashboard bottleneck drilldown panels for finding-category and affected-job hotspots.
 
 ### Changed
 - `analyze` now emits runner right-sizing findings in optimization reports.

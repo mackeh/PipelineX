@@ -782,7 +782,7 @@ pipelinex/
 
 - [ ] GitHub App with automatic PR analysis and comments
 - [x] GitLab webhook integration
-- [ ] Web dashboard: overview, pipeline explorer, bottleneck drilldown
+- [x] Web dashboard: overview, pipeline explorer, bottleneck drilldown
 - [ ] Interactive DAG visualization (D3.js)
 - [ ] Trend analysis charts (duration, failure rate, cost over time)
 - [ ] Flaky test management UI (quarantine, track, resolve)

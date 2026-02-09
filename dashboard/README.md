@@ -3,8 +3,10 @@
 The dashboard now supports:
 
 - Live pipeline analysis from real `pipelinex` CLI output
+- Bottleneck drilldown panels (category and job hotspots)
 - GitHub webhook ingestion for workflow history refresh
 - GitLab webhook ingestion for pipeline history refresh
+- Threshold-based alerting (duration, failure rate, opportunity cost)
 - Anonymized community benchmark submissions and cohort comparisons
 
 ## Run locally
