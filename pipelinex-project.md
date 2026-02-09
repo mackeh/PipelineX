@@ -783,11 +783,11 @@ pipelinex/
 - [x] GitHub App with automatic PR analysis and comments
 - [x] GitLab webhook integration
 - [x] Web dashboard: overview, pipeline explorer, bottleneck drilldown
-- [ ] Interactive DAG visualization (D3.js)
-- [ ] Trend analysis charts (duration, failure rate, cost over time)
+- [x] Interactive DAG visualization (D3.js)
+- [x] Trend analysis charts (duration, failure rate, cost over time)
 - [ ] Flaky test management UI (quarantine, track, resolve)
 - [ ] Cost center dashboard with waste breakdown
-- [ ] Slack/Teams/email weekly digest reports
+- [x] Slack/Teams/email weekly digest reports
 - [x] Alert system (threshold-based: duration, failure rate, cost)
 - [ ] Bitbucket Pipelines + CircleCI parser support
 - [ ] "Apply optimization" one-click PR creation

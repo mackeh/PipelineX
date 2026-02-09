@@ -3,11 +3,14 @@
 The dashboard now supports:
 
 - Live pipeline analysis from real `pipelinex` CLI output
+- Interactive DAG visualization (D3-based pipeline explorer)
+- Trend analysis charts (duration, failure rate, and cost per run)
 - Bottleneck drilldown panels (category and job hotspots)
 - GitHub App-style PR webhook analysis and automatic PR comments
 - GitHub webhook ingestion for workflow history refresh
 - GitLab webhook ingestion for pipeline history refresh
 - Threshold-based alerting (duration, failure rate, opportunity cost)
+- Weekly digest reporting with Slack/Teams delivery and email outbox queueing
 - Anonymized community benchmark submissions and cohort comparisons
 
 ## Run locally
@@ -118,6 +121,35 @@ Optional query params:
 - `runsPerMonth`
 - `developerHourlyRate`
 
+### `GET /api/digest/weekly`
+
+Generates a weekly digest summary from history cache snapshots.
+
+Optional query params:
+
+- `windowDays`
+- `runsPerMonth`
+- `developerHourlyRate`
+
+### `POST /api/digest/weekly`
+
+Generates a weekly digest and optionally delivers it.
+
+Request:
+
+```json
+{
+  "windowDays": 7,
+  "deliver": true,
+  "channels": {
+    "dryRun": false,
+    "slackWebhookUrl": "https://hooks.slack.com/services/...",
+    "teamsWebhookUrl": "https://outlook.office.com/webhook/...",
+    "emailRecipients": ["team@example.com"]
+  }
+}
+```
+
 ### `POST /api/benchmarks/submit`
 
 Stores anonymized benchmark metrics derived from an analysis report and returns cohort stats.
@@ -223,6 +255,11 @@ Custom integration scopes:
 - `PIPELINEX_HISTORY_RUNS`: optional lookback window for webhook-triggered refreshes (default `100`).
 - `PIPELINEX_ALERT_RUNS_PER_MONTH`: default runs/month used in cost-based alert evaluation.
 - `PIPELINEX_ALERT_DEVELOPER_HOURLY_RATE`: default developer hourly rate used in cost-based alert evaluation.
+- `PIPELINEX_DIGEST_WINDOW_DAYS`: default weekly digest lookback window.
+- `PIPELINEX_DIGEST_SLACK_WEBHOOK_URL`: default Slack webhook for digest delivery.
+- `PIPELINEX_DIGEST_TEAMS_WEBHOOK_URL`: default Teams webhook for digest delivery.
+- `PIPELINEX_DIGEST_EMAIL_TO`: comma-separated digest recipients for email outbox queueing.
+- `PIPELINEX_DIGEST_EMAIL_OUTBOX`: optional output path for queued digest email payloads.
 - `PIPELINEX_API_KEY`: single-key public API mode.
 - `PIPELINEX_API_KEY_ROLES`: CSV roles for the single-key public API mode.
 - `PIPELINEX_API_KEYS`: JSON array of key configs (supports rotation fields).
@@ -242,6 +279,7 @@ Custom integration scopes:
 - Benchmark registry: `.pipelinex/benchmark-registry.json`
 - Optimization impact registry: `.pipelinex/optimization-impact-registry.json`
 - Alert rules: `.pipelinex/alert-rules.json`
+- Digest email outbox: `.pipelinex/digest-email-outbox.jsonl`
 - Public API rate-limit store: `.pipelinex/public-api-rate-limits.json`
 - Public API audit log: `.pipelinex/public-api-audit.log`
 

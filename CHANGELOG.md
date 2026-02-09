@@ -18,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dashboard bottleneck drilldown panels for finding-category and affected-job hotspots.
 - GitHub App PR analysis webhook endpoint with automated PR comment upsert:
   - `POST /api/github/app/webhook`
+- Dashboard interactive DAG explorer (`D3`) integrated into the main analysis view.
+- Dashboard trend analysis charts for duration, failure rate, and cost per run from history snapshots.
+- Weekly digest reporting API with optional Slack/Teams delivery and email outbox queueing:
+  - `GET /api/digest/weekly`
+  - `POST /api/digest/weekly`
 
 ### Changed
 - `analyze` now emits runner right-sizing findings in optimization reports.
