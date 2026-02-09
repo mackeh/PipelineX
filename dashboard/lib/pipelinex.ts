@@ -479,6 +479,17 @@ async function runPipelinexJsonCommand(
   return stdout;
 }
 
+async function runPipelinexCommand(
+  commandSuffix: string[],
+  timeoutMs = 120_000,
+): Promise<string> {
+  const repoRoot = await getRepoRoot();
+  const commandPrefix = await findPipelinexCommand(repoRoot);
+  const command = [...commandPrefix, ...commandSuffix];
+  const { stdout } = await runCommand(command, repoRoot, timeoutMs);
+  return stdout;
+}
+
 export async function analyzePipelineFile(inputPath: string): Promise<AnalysisReport> {
   const absolutePath = await resolveRepoPath(inputPath);
   const stdout = await runPipelinexJsonCommand([
@@ -498,6 +509,16 @@ export async function analyzePipelineFile(inputPath: string): Promise<AnalysisRe
       }\nOutput preview:\n${preview}`,
     );
   }
+}
+
+export async function optimizePipelineFile(inputPath: string): Promise<string> {
+  const absolutePath = await resolveRepoPath(inputPath);
+  const stdout = await runPipelinexCommand(["optimize", absolutePath]);
+  const normalized = stdout.trim();
+  if (!normalized) {
+    throw new Error("Optimizer did not return any output.");
+  }
+  return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
 export async function analyzePipelineContent(
