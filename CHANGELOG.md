@@ -8,9 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned Features
-- CI provider migration assistant ("convert GitHub Actions → GitLab CI")
 - Runner right-sizing recommendations (based on resource profiling)
-- Multi-repo pipeline analysis (monorepo orchestration detection)
+
+## [1.3.0] - 2026-02-09
+
+### Added
+- CI provider migration assistant with DAG-based conversion from GitHub Actions to GitLab CI.
+- New `pipelinex migrate` command with `text`, `json`, and `yaml` output modes.
+- Multi-repo orchestration analysis engine for cross-repository edge detection.
+- New `pipelinex multi-repo` command for monorepo/multi-repo orchestration visibility.
+- New documentation:
+  - `docs/MIGRATION_ASSISTANT.md`
+  - `docs/MULTI_REPO_ANALYSIS.md`
+
+### Changed
+- Roadmap tracking now marks Phase 4 migration assistant and multi-repo analysis as complete.
+- README and quickstart command references include migration and multi-repo workflows.
 
 ## [1.2.1] - 2026-02-08
 
@@ -160,6 +173,7 @@ See [GitHub Issues](https://github.com/mackeh/PipelineX/issues) for planned feat
 
 ---
 
+[1.3.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.3.0
 [1.2.1]: https://github.com/mackeh/PipelineX/releases/tag/v1.2.1
 [1.2.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.2.0
 [1.1.0]: https://github.com/mackeh/PipelineX/releases/tag/v1.1.0
