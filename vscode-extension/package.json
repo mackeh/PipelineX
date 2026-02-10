@@ -2,7 +2,7 @@
   "name": "pipelinex-vscode",
   "displayName": "PipelineX",
   "description": "Inline CI workflow optimization hints powered by PipelineX",
-  "version": "0.1.0",
+  "version": "2.1.0",
   "publisher": "mackeh",
   "license": "MIT",
   "engines": {
