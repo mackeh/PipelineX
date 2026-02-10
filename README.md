@@ -229,7 +229,7 @@ $ pipelinex analyze .github/workflows/ci.yml
 <summary><b>📊 Click to see analysis output</b></summary>
 
 ```
- PipelineX v0.1.0 — Analyzing ci.yml
+ PipelineX v2.0.0 — Analyzing ci.yml
 
  Pipeline Structure
  |- 6 jobs, 23 steps
@@ -361,7 +361,7 @@ $ pipelinex cost .github/workflows/ --runs-per-month 500 --team-size 10
 <summary><b>💰 Click to see cost breakdown</b></summary>
 
 ```
- PipelineX v0.1.0 — Cost Estimation
+ PipelineX v2.0.0 — Cost Estimation
 
  Pipeline: ci.yml
  |- Runs per month: 500
@@ -403,7 +403,7 @@ $ pipelinex select-tests HEAD~1 HEAD
 <summary><b>🎯 Click to see test selection output</b></summary>
 
 ```
- PipelineX v0.1.0 — Smart Test Selection
+ PipelineX v2.0.0 — Smart Test Selection
 
  Changed Files
  |- src/auth/login.rs
@@ -448,7 +448,7 @@ $ pipelinex flaky test-results/
 <summary><b>🔬 Click to see flaky test report</b></summary>
 
 ```
- PipelineX v0.1.0 — Flaky Test Detector
+ PipelineX v2.0.0 — Flaky Test Detector
 
  Detection Summary
  |- Total tests analyzed: 247
