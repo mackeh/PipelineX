@@ -85,3 +85,5 @@ Thanks to the community for the quick feedback on the v2.0.0 release which helpe
 ---
 
 **Make your pipelines fast. Your future self will thank you.** ⚡
+
+Questions? Open an issue or start a discussion on GitHub!

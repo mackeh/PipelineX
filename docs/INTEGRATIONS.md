@@ -217,7 +217,7 @@ Add to `.vscode/tasks.json`:
 
 ```json
 {
-  "version": "2.1.0",
+  "version": "2.1.1",
   "tasks": [
     {
       "label": "PipelineX: Analyze Pipeline",

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-02-10
+
+### Fixed
+- Resolved version mismatch in VS Code extension (was `0.1.0`, now `2.1.1`).
+- Updated integration documentation examples to reflect correct `2.1.1` version.
+
 ## [2.1.0] - 2026-02-10
 
 ### Added
