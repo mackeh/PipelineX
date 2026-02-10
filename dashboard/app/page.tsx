@@ -16,7 +16,6 @@ import {
   Users,
   Workflow,
   Wrench,
-  X,
   type LucideIcon,
 } from "lucide-react";
 import {

@@ -2332,9 +2332,9 @@ export async function calculateOrgLevelMetrics(): Promise<OrgLevelMetrics> {
   const historySnapshots = await listHistorySnapshots();
 
   const teamsSummary = [];
-  let totalFindings = 0;
-  let totalHealthScore = 0;
-  let healthScoreCount = 0;
+  const totalFindings = 0;
+  const totalHealthScore = 0;
+  const healthScoreCount = 0;
   const allPipelinePaths = new Set<string>();
 
   for (const team of teams) {
@@ -2366,7 +2366,6 @@ export async function calculateOrgLevelMetrics(): Promise<OrgLevelMetrics> {
       teamMetrics.avg_duration_secs = totalDuration / teamSnapshots.length;
 
       const runsPerMonth = team.settings.default_runs_per_month || 500;
-      const developerRate = team.settings.default_developer_rate || 150;
 
       // Estimate monthly cost (simplified calculation)
       const computeCostPerRun = (teamMetrics.avg_duration_secs / 60) * 0.008; // $0.008 per minute
