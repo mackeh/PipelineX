@@ -112,6 +112,14 @@ An intelligent CI/CD analysis platform that watches your pipelines, identifies e
 
 ![PipelineX Dashboard](assets/dashboard-preview.png)
 
+### Interactive Visualization
+
+![DAG Explorer](assets/dag-explorer.png)
+
+### Deep Cost Analysis
+
+![Trends and Cost Center](assets/trends-cost.png)
+
 ---
 
 ### Basic Usage
@@ -575,23 +583,23 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 
 ## 📋 Commands
 
-| Command        | Description                                | Example                                                          |
-| -------------- | ------------------------------------------ | ---------------------------------------------------------------- |
-| `analyze`      | Analyze pipelines for bottlenecks          | `pipelinex analyze .github/workflows/ci.yml`                     |
-| `optimize`     | Generate optimized config                  | `pipelinex optimize ci.yml -o ci-opt.yml`                        |
-| `diff`         | Show changes between current and optimized | `pipelinex diff ci.yml`                                          |
-| `apply`        | Apply optimization & create PR (one-click) | `pipelinex apply .github/workflows/ci.yml --repo owner/repo`     |
-| `cost`         | Estimate CI/CD costs and savings           | `pipelinex cost .github/workflows/ --team-size 10`               |
-| `graph`        | Visualize pipeline DAG                     | `pipelinex graph ci.yml --format mermaid`                        |
-| `simulate`     | Monte Carlo simulation                     | `pipelinex simulate ci.yml --runs 1000`                          |
-| `docker`       | Analyze Dockerfiles                        | `pipelinex docker Dockerfile --optimize`                         |
-| `select-tests` | Smart test selection                       | `pipelinex select-tests HEAD~1 HEAD`                             |
-| `flaky`        | Detect flaky tests                         | `pipelinex flaky test-results/*.xml`                             |
-| `history`      | Analyze workflow run history               | `pipelinex history --repo org/repo --workflow ci.yml --runs 100` |
+| Command        | Description                                | Example                                                                       |
+| -------------- | ------------------------------------------ | ----------------------------------------------------------------------------- |
+| `analyze`      | Analyze pipelines for bottlenecks          | `pipelinex analyze .github/workflows/ci.yml`                                  |
+| `optimize`     | Generate optimized config                  | `pipelinex optimize ci.yml -o ci-opt.yml`                                     |
+| `diff`         | Show changes between current and optimized | `pipelinex diff ci.yml`                                                       |
+| `apply`        | Apply optimization & create PR (one-click) | `pipelinex apply .github/workflows/ci.yml --repo owner/repo`                  |
+| `cost`         | Estimate CI/CD costs and savings           | `pipelinex cost .github/workflows/ --team-size 10`                            |
+| `graph`        | Visualize pipeline DAG                     | `pipelinex graph ci.yml --format mermaid`                                     |
+| `simulate`     | Monte Carlo simulation                     | `pipelinex simulate ci.yml --runs 1000`                                       |
+| `docker`       | Analyze Dockerfiles                        | `pipelinex docker Dockerfile --optimize`                                      |
+| `select-tests` | Smart test selection                       | `pipelinex select-tests HEAD~1 HEAD`                                          |
+| `flaky`        | Detect flaky tests                         | `pipelinex flaky test-results/*.xml`                                          |
+| `history`      | Analyze workflow run history               | `pipelinex history --repo org/repo --workflow ci.yml --runs 100`              |
 | `migrate`      | Migrate CI provider config                 | `pipelinex migrate .github/workflows/ci.yml --to gitlab-ci -o .gitlab-ci.yml` |
-| `multi-repo`   | Analyze cross-repo orchestration patterns  | `pipelinex multi-repo /path/to/repos --format json`              |
-| `right-size`   | Recommend right-sized CI runners           | `pipelinex right-size .github/workflows/ --format json`          |
-| `plugins`      | Plugin scaffold/list                       | `pipelinex plugins scaffold .pipelinex/plugins.json`             |
+| `multi-repo`   | Analyze cross-repo orchestration patterns  | `pipelinex multi-repo /path/to/repos --format json`                           |
+| `right-size`   | Recommend right-sized CI runners           | `pipelinex right-size .github/workflows/ --format json`                       |
+| `plugins`      | Plugin scaffold/list                       | `pipelinex plugins scaffold .pipelinex/plugins.json`                          |
 
 ### Output Formats
 

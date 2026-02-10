@@ -112,15 +112,15 @@ function formatUsd(value: number): string {
 function severityColor(severity: string): string {
   switch (severity.toLowerCase()) {
     case "critical":
-      return "bg-red-500/15 text-red-300 border-red-500/40";
+      return "bg-red-500/10 text-red-400 border-red-500/20 ring-1 ring-red-500/20";
     case "high":
-      return "bg-orange-500/15 text-orange-300 border-orange-500/40";
+      return "bg-orange-500/10 text-orange-400 border-orange-500/20 ring-1 ring-orange-500/20";
     case "medium":
-      return "bg-yellow-500/15 text-yellow-200 border-yellow-500/40";
+      return "bg-yellow-500/10 text-yellow-400 border-yellow-500/20 ring-1 ring-yellow-500/20";
     case "low":
-      return "bg-sky-500/15 text-sky-200 border-sky-500/40";
+      return "bg-sky-500/10 text-sky-400 border-sky-500/20 ring-1 ring-sky-500/20";
     default:
-      return "bg-slate-500/20 text-slate-200 border-slate-500/40";
+      return "bg-zinc-500/10 text-zinc-400 border-zinc-500/20 ring-1 ring-zinc-500/20";
   }
 }
 
@@ -739,16 +739,15 @@ export default function DashboardPage() {
     benchmarkStats ? savingsPercent - benchmarkStats.improvement_median_pct : null;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col lg:flex-row">
-        <aside className="w-full border-b border-zinc-800 bg-zinc-900/70 lg:min-h-screen lg:w-72 lg:border-b-0 lg:border-r">
-          <div className="flex items-center gap-3 border-b border-zinc-800 px-6 py-5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500/20 text-cyan-300">
+    <div className="min-h-screen bg-transparent text-zinc-100 flex font-sans">
+        <aside className="fixed inset-y-0 left-0 z-50 w-72 glass-panel border-r border-zinc-800/50 flex flex-col transition-transform duration-300 -translate-x-full lg:translate-x-0 lg:static lg:h-screen">
+          <div className="flex items-center gap-3 px-6 h-16 border-b border-zinc-800/50 bg-zinc-900/20">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 text-cyan-400 ring-1 ring-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
               <Workflow className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-zinc-400">PipelineX</p>
-              <h1 className="text-xl font-semibold text-zinc-50">Platform Dashboard</h1>
+              <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold">PipelineX</p>
+              <h1 className="text-base font-medium text-zinc-100 tracking-tight">Dashboard</h1>
             </div>
           </div>
 
@@ -759,42 +758,56 @@ export default function DashboardPage() {
             <NavItem icon={Wrench} label="Optimization Queue" />
           </nav>
 
-          <div className="border-t border-zinc-800 px-6 py-4">
-            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Roadmap</p>
-            <p className="mt-2 text-sm text-zinc-200">Phase 3 active: dashboard + automation APIs.</p>
+          <div className="mt-auto border-t border-zinc-800/50 px-6 py-4 bg-zinc-900/20">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-2">System Status</p>
+            <div className="flex items-center gap-2 text-xs text-zinc-400">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+              Phase 3 Active
+            </div>
           </div>
         </aside>
 
-        <main className="flex-1 px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
-          <section className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 sm:p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-zinc-50">Analyze a pipeline file</h2>
-                <p className="text-sm text-zinc-400">
-                  Run live analysis directly from the dashboard and inspect findings instantly.
-                </p>
-              </div>
+        <main className="flex-1 min-w-0 overflow-y-auto h-screen">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+            <header className="mb-8">
+               <h2 className="text-2xl font-semibold text-zinc-50 tracking-tight">Pipeline Analysis</h2>
+               <p className="text-zinc-400 mt-1">Live inspection and optimization of CI/CD workflows.</p>
+            </header>
 
-              <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto">
-                <select
-                  value={selectedPath}
-                  onChange={(event) => setSelectedPath(event.target.value)}
-                  className="min-w-[280px] rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 focus:border-cyan-400 focus:outline-none"
-                  disabled={loadingWorkflows || runningAnalysis}
-                >
-                  {workflows.length === 0 && <option value="">No pipeline files found</option>}
-                  {workflows.map((workflowPath) => (
-                    <option key={workflowPath} value={workflowPath}>
-                      {workflowPath}
-                    </option>
-                  ))}
-                </select>
+            <section className="glass-panel rounded-xl p-1 mb-8">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between bg-zinc-900/40 rounded-lg p-4 border border-zinc-800/30">
+                <div>
+                  <h3 className="text-sm font-medium text-zinc-200">Select Pipeline</h3>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Choose a workflow file to analyze
+                  </p>
+                </div>
+
+              <div className="flex w-full flex-col gap-3 sm:flex-row lg:w-auto items-center">
+                <div className="relative">
+                  <select
+                    value={selectedPath}
+                    onChange={(event) => setSelectedPath(event.target.value)}
+                    className="appearance-none w-full min-w-[280px] rounded-lg border border-zinc-700 bg-zinc-950/50 px-4 py-2.5 text-sm text-zinc-200 focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 focus:outline-none transition-all hover:border-zinc-600"
+                    disabled={loadingWorkflows || runningAnalysis}
+                  >
+                    {workflows.length === 0 && <option value="">No pipeline files found</option>}
+                    {workflows.map((workflowPath) => (
+                      <option key={workflowPath} value={workflowPath}>
+                        {workflowPath}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-zinc-500">
+                    <svg className="h-4 w-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" fillRule="evenodd"></path></svg>
+                  </div>
+                </div>
 
                 <button
                   type="button"
                   onClick={() => void runAnalysis(selectedPath)}
                   disabled={!selectedPath || runningAnalysis}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-cyan-400 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 px-5 py-2.5 text-sm font-medium text-zinc-950 shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all hover:bg-cyan-400 hover:shadow-[0_0_25px_rgba(6,182,212,0.45)] hover:scale-[1.02] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 disabled:shadow-none"
                 >
                   {runningAnalysis ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                   {runningAnalysis ? "Analyzing..." : "Run Analysis"}
@@ -813,6 +826,7 @@ export default function DashboardPage() {
                 )}
               </div>
             </div>
+
 
             {lastUpdated && (
               <p className="mt-3 text-xs uppercase tracking-[0.16em] text-zinc-500">
@@ -863,80 +877,111 @@ export default function DashboardPage() {
 
           {report && (
             <>
-              <section className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <StatCard
-                  title="Current Duration"
-                  value={formatDuration(report.total_estimated_duration_secs)}
-                  subtitle={`Provider: ${report.provider}`}
-                  icon={Clock3}
-                />
-                <StatCard
-                  title="Optimized Projection"
-                  value={formatDuration(report.optimized_duration_secs)}
-                  subtitle={`${percentage(savingsPercent)} faster`}
-                  icon={Gauge}
-                />
-                <StatCard
-                  title="Potential Savings"
-                  value={formatDuration(savingsSeconds)}
-                  subtitle={`${report.findings.length} findings`}
-                  icon={CheckCircle2}
-                />
-                <StatCard
-                  title="Health Score"
-                  value={report.health_score ? report.health_score.total_score.toFixed(1) : "n/a"}
-                  subtitle={report.health_score?.grade ?? "No grade"}
-                  icon={Activity}
-                />
+              <section className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="glass-panel p-5 rounded-xl flex items-center gap-4 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="p-3 bg-cyan-500/10 rounded-lg text-cyan-400 ring-1 ring-cyan-500/20">
+                    <Clock3 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Current Duration</p>
+                    <p className="text-2xl font-bold text-zinc-100 mt-0.5">{formatDuration(report.total_estimated_duration_secs)}</p>
+                    <p className="text-xs text-zinc-500 mt-1">Provider: {report.provider}</p>
+                  </div>
+                </div>
+
+                <div className="glass-panel p-5 rounded-xl flex items-center gap-4 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="p-3 bg-purple-500/10 rounded-lg text-purple-400 ring-1 ring-purple-500/20">
+                    <Gauge className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Optimized</p>
+                    <p className="text-2xl font-bold text-zinc-100 mt-0.5">{formatDuration(report.optimized_duration_secs)}</p>
+                    <p className="text-xs text-emerald-400 mt-1 font-medium">{percentage(savingsPercent)} faster</p>
+                  </div>
+                </div>
+
+                <div className="glass-panel p-5 rounded-xl flex items-center gap-4 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="p-3 bg-emerald-500/10 rounded-lg text-emerald-400 ring-1 ring-emerald-500/20">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Potential Savings</p>
+                    <p className="text-2xl font-bold text-zinc-100 mt-0.5">{formatDuration(savingsSeconds)}</p>
+                    <p className="text-xs text-zinc-500 mt-1">{report.findings.length} findings found</p>
+                  </div>
+                </div>
+
+                <div className="glass-panel p-5 rounded-xl flex items-center gap-4 relative overflow-hidden group">
+                  <div className="absolute inset-0 bg-gradient-to-br from-orange-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="p-3 bg-orange-500/10 rounded-lg text-orange-400 ring-1 ring-orange-500/20">
+                    <Activity className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Health Score</p>
+                    <p className="text-2xl font-bold text-zinc-100 mt-0.5">{report.health_score ? report.health_score.total_score.toFixed(0) : "N/A"}</p>
+                    <p className="text-xs text-zinc-500 mt-1">Grade: <span className="font-bold text-zinc-300">{report.health_score?.grade ?? "-"}</span></p>
+                  </div>
+                </div>
               </section>
 
-              <section className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <section className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-2">
                 <Panel title="Duration Snapshot">
-                  <ResponsiveContainer width="100%" height={260}>
-                    <AreaChart data={durationData} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <AreaChart data={durationData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="durationFill" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.4} />
-                          <stop offset="100%" stopColor="#22d3ee" stopOpacity={0.06} />
+                          <stop offset="0%" stopColor="#06b6d4" stopOpacity={0.4} />
+                          <stop offset="100%" stopColor="#06b6d4" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid stroke="#3f3f46" strokeDasharray="3 3" />
-                      <XAxis dataKey="name" stroke="#a1a1aa" />
-                      <YAxis stroke="#a1a1aa" />
+                      <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} strokeDasharray="3 3" />
+                      <XAxis dataKey="name" stroke="#71717a" tick={{fill: '#71717a', fontSize: 12}} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#71717a" tick={{fill: '#71717a', fontSize: 12}} tickLine={false} axisLine={false} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: "#09090b", border: "1px solid #3f3f46" }}
-                        labelStyle={{ color: "#e4e4e7" }}
+                        contentStyle={{ backgroundColor: "#09090b", border: "1px solid #27272a", borderRadius: "8px", boxShadow: "0 4px 20px rgba(0,0,0,0.5)" }}
+                        itemStyle={{ color: "#e4e4e7" }}
+                        labelStyle={{ color: "#a1a1aa", marginBottom: "4px" }}
+                        cursor={{ stroke: '#27272a', strokeWidth: 1 }}
                       />
                       <Area
                         type="monotone"
                         dataKey="duration"
-                        stroke="#22d3ee"
-                        strokeWidth={2}
+                        stroke="#06b6d4"
+                        strokeWidth={3}
                         fill="url(#durationFill)"
+                        activeDot={{ r: 6, fill: "#06b6d4", stroke: "#000", strokeWidth: 2 }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 </Panel>
 
                 <Panel title="Finding Severity">
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={severityData} margin={{ top: 12, right: 8, left: -20, bottom: 0 }}>
-                      <CartesianGrid stroke="#3f3f46" strokeDasharray="3 3" />
-                      <XAxis dataKey="name" stroke="#a1a1aa" />
-                      <YAxis allowDecimals={false} stroke="#a1a1aa" />
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={severityData} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
+                      <CartesianGrid stroke="rgba(255,255,255,0.05)" vertical={false} strokeDasharray="3 3" />
+                      <XAxis dataKey="name" stroke="#71717a" tick={{fill: '#71717a', fontSize: 12}} tickLine={false} axisLine={false} />
+                      <YAxis allowDecimals={false} stroke="#71717a" tick={{fill: '#71717a', fontSize: 12}} tickLine={false} axisLine={false} />
                       <Tooltip
-                        contentStyle={{ backgroundColor: "#09090b", border: "1px solid #3f3f46" }}
-                        labelStyle={{ color: "#e4e4e7" }}
+                        contentStyle={{ backgroundColor: "#09090b", border: "1px solid #27272a", borderRadius: "8px", boxShadow: "0 4px 20px rgba(0,0,0,0.5)" }}
+                        itemStyle={{ color: "#e4e4e7" }}
+                        labelStyle={{ color: "#a1a1aa", marginBottom: "4px" }}
+                        cursor={{ fill: 'rgba(255,255,255,0.03)' }}
                       />
-                      <Bar dataKey="count" fill="#f97316" radius={[6, 6, 0, 0]} />
+                      <Bar dataKey="count" fill="#f97316" radius={[6, 6, 0, 0]}>
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </Panel>
               </section>
 
-              <section className="mt-5">
-                <Panel title="Pipeline Explorer: Interactive DAG (D3)">
-                  <DagExplorer report={report} />
+              <section className="mt-6">
+                <Panel title="Pipeline Explorer: Interactive DAG">
+                  <div className="bg-zinc-950/30 rounded-lg overflow-hidden border border-zinc-900/50">
+                     <DagExplorer report={report} />
+                  </div>
                 </Panel>
               </section>
 
@@ -1814,10 +1859,12 @@ export default function DashboardPage() {
                 )}
               </Panel>
             </section>
+
           )}
+
+          </div>
         </main>
       </div>
-    </div>
   );
 }
 
@@ -1870,32 +1917,7 @@ function Panel({
   );
 }
 
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-}: {
-  title: string;
-  value: string;
-  subtitle: string;
-  icon: LucideIcon;
-}) {
-  return (
-    <article className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-[0.14em] text-zinc-500">{title}</p>
-          <p className="mt-2 text-2xl font-semibold text-zinc-50">{value}</p>
-          <p className="mt-1 text-sm text-zinc-400">{subtitle}</p>
-        </div>
-        <span className="rounded-lg bg-zinc-800 p-2 text-cyan-300">
-          <Icon className="h-5 w-5" />
-        </span>
-      </div>
-    </article>
-  );
-}
+
 
 function FindingRow({ finding }: { finding: Finding }) {
   return (

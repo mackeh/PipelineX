@@ -275,20 +275,32 @@ export function DagExplorer({ report }: DagExplorerProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500 font-medium">
         <span>
           Interactive D3 graph of critical-path jobs and finding categories. Drag nodes and scroll to zoom.
         </span>
-        <span>{graph.nodes.length} nodes / {graph.links.length} links</span>
+        <span className="bg-zinc-800/50 px-2 py-0.5 rounded-full text-zinc-400">{graph.nodes.length} nodes / {graph.links.length} links</span>
       </div>
-      <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-2">
-        <svg ref={svgRef} className="h-[360px] w-full" />
+      
+      <div className="rounded-xl border border-white/5 bg-zinc-900/20 backdrop-blur-sm p-1 shadow-inner">
+         <div className="rounded-lg overflow-hidden bg-zinc-950/30">
+            <svg ref={svgRef} className="h-[400px] w-full" style={{cursor: 'grab'}} />
+         </div>
       </div>
+
       {selectedNode && (
-        <p className="text-xs text-zinc-300">
-          Selected: <span className="font-semibold text-zinc-100">{selectedNode.label}</span>{" "}
-          ({selectedNode.kind})
-        </p>
+        <div className="glass-panel px-4 py-2 rounded-lg inline-flex items-center gap-2">
+          <span className="text-xs text-zinc-400 uppercase tracking-wider font-semibold">{selectedNode.kind}</span>
+          <span className="w-px h-3 bg-zinc-700"></span>
+          <span className="text-sm font-medium text-zinc-100">{selectedNode.label}</span>
+          {selectedNode.severityWeight > 0 && (
+             <span className={`ml-2 w-2 h-2 rounded-full ${
+                selectedNode.severityWeight >= 4 ? 'bg-red-500' :
+                selectedNode.severityWeight >= 3 ? 'bg-orange-500' :
+                'bg-yellow-500'
+             } shadow-[0_0_8px_currentColor]`} />
+          )}
+        </div>
       )}
     </div>
   );

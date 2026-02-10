@@ -1,11 +1,20 @@
 @import "tailwindcss";
 
 :root {
-  --bg-deep: #07090f;
-  --bg-mid: #0d111d;
-  --ink: #ececf0;
-  --muted: #8d95a7;
-  --accent: #22d3ee;
+  /* Richer, deeper dark mode palette */
+  --bg-deep: #050505; /* Almost black for depth */
+  --bg-mid: #0a0a0b; /* Slightly lighter for cards */
+  --bg-surface: #121214; /* Elevated surfaces */
+
+  --ink-primary: #f4f4f5; /* Zinc-100 */
+  --ink-secondary: #a1a1aa; /* Zinc-400 */
+  --ink-tertiary: #52525b; /* Zinc-600 */
+
+  --accent-primary: #06b6d4; /* Cyan-500 */
+  --accent-glow: rgba(6, 182, 212, 0.15);
+
+  --border-subtle: #27272a; /* Zinc-800 */
+  --border-highlight: #3f3f46; /* Zinc-700 */
 }
 
 @theme inline {
@@ -15,19 +24,51 @@
 
 body {
   min-height: 100vh;
-  color: var(--ink);
-  background:
-    radial-gradient(1200px 700px at 20% -20%, rgba(34, 211, 238, 0.14), transparent 65%),
-    radial-gradient(900px 560px at 110% 0%, rgba(244, 114, 182, 0.12), transparent 65%),
-    linear-gradient(180deg, var(--bg-mid) 0%, var(--bg-deep) 70%);
+  color: var(--ink-primary);
+  background-color: var(--bg-deep);
+  /* More subtle, professional gradient mesh */
+  background-image:
+    radial-gradient(
+      circle at 15% 0%,
+      rgba(6, 182, 212, 0.08) 0%,
+      transparent 40%
+    ),
+    radial-gradient(
+      circle at 85% 100%,
+      rgba(168, 85, 247, 0.05) 0%,
+      transparent 40%
+    );
   font-family: var(--font-space-grotesk), sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  border-color: #27272a;
+/* Scrollbar styling for a cleaner look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-deep);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-highlight);
 }
 
+/* Global utility enhancements */
 code,
 pre {
   font-family: var(--font-ibm-plex-mono), monospace;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(18, 18, 20, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
 }
