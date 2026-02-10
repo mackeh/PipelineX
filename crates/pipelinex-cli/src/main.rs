@@ -581,11 +581,13 @@ async fn cmd_apply(
 
     // Verify we're in a git repository
     let git_check = Command::new("git")
-        .args(&["rev-parse", "--git-dir"])
+        .args(["rev-parse", "--git-dir"])
         .output();
 
     if git_check.is_err() || !git_check.unwrap().status.success() {
-        anyhow::bail!("Not in a git repository. Please run this command from within a git repository.");
+        anyhow::bail!(
+            "Not in a git repository. Please run this command from within a git repository."
+        );
     }
 
     // Get the GitHub token
@@ -599,7 +601,7 @@ async fn cmd_apply(
     } else {
         // Try to detect from git remote
         let output = Command::new("git")
-            .args(&["remote", "get-url", "origin"])
+            .args(["remote", "get-url", "origin"])
             .output()
             .context("Failed to get git remote origin")?;
 
@@ -610,13 +612,17 @@ async fn cmd_apply(
         let remote_url = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
         // Parse GitHub URL (supports both HTTPS and SSH)
-        let repo = if let Some(captures) = regex::Regex::new(r"github\.com[:/](.+?/[^/]+?)(?:\.git)?$")
-            .unwrap()
-            .captures(&remote_url)
+        let repo = if let Some(captures) =
+            regex::Regex::new(r"github\.com[:/](.+?/[^/]+?)(?:\.git)?$")
+                .unwrap()
+                .captures(&remote_url)
         {
             captures.get(1).unwrap().as_str().to_string()
         } else {
-            anyhow::bail!("Could not parse GitHub repository from remote URL: {}", remote_url);
+            anyhow::bail!(
+                "Could not parse GitHub repository from remote URL: {}",
+                remote_url
+            );
         };
 
         repo
@@ -636,42 +642,47 @@ async fn cmd_apply(
     let optimized_content = Optimizer::optimize(path, &report)?;
 
     // Create a new branch name
-    let filename = path.file_stem().and_then(|s| s.to_str()).unwrap_or("config");
+    let filename = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("config");
     let branch_name = format!("pipelinex-optimize-{}", filename);
 
     println!("🌿 Creating branch: {}", branch_name);
 
     // Check if branch already exists
     let branch_exists = Command::new("git")
-        .args(&["rev-parse", "--verify", &branch_name])
+        .args(["rev-parse", "--verify", &branch_name])
         .output()
         .ok()
         .map(|o| o.status.success())
         .unwrap_or(false);
 
     if branch_exists {
-        println!("⚠️  Branch {} already exists. Switching to it...", branch_name);
+        println!(
+            "⚠️  Branch {} already exists. Switching to it...",
+            branch_name
+        );
         Command::new("git")
-            .args(&["checkout", &branch_name])
+            .args(["checkout", &branch_name])
             .status()
             .context("Failed to checkout existing branch")?;
     } else {
         // Create and checkout new branch
         Command::new("git")
-            .args(&["checkout", "-b", &branch_name])
+            .args(["checkout", "-b", &branch_name])
             .status()
             .context("Failed to create new branch")?;
     }
 
     // Write optimized config
     println!("📝 Writing optimized configuration...");
-    std::fs::write(path, &optimized_content)
-        .context("Failed to write optimized configuration")?;
+    std::fs::write(path, &optimized_content).context("Failed to write optimized configuration")?;
 
     // Commit changes
     println!("💾 Committing changes...");
     Command::new("git")
-        .args(&["add", path.to_str().unwrap()])
+        .args(["add", path.to_str().unwrap()])
         .status()
         .context("Failed to git add")?;
 
@@ -684,20 +695,21 @@ async fn cmd_apply(
         filename,
         report.findings.len(),
         ((report.total_estimated_duration_secs - report.optimized_duration_secs)
-            / report.total_estimated_duration_secs * 100.0),
+            / report.total_estimated_duration_secs
+            * 100.0),
         report.total_estimated_duration_secs,
         report.optimized_duration_secs
     );
 
     Command::new("git")
-        .args(&["commit", "-m", &commit_msg])
+        .args(["commit", "-m", &commit_msg])
         .status()
         .context("Failed to commit changes")?;
 
     // Push to remote
     println!("⬆️  Pushing to remote...");
     Command::new("git")
-        .args(&["push", "-u", "origin", &branch_name])
+        .args(["push", "-u", "origin", &branch_name])
         .status()
         .context("Failed to push branch")?;
 
@@ -711,7 +723,10 @@ async fn cmd_apply(
 
     let parts: Vec<&str> = repo_name.split('/').collect();
     if parts.len() != 2 {
-        anyhow::bail!("Invalid repository format. Expected owner/repo, got: {}", repo_name);
+        anyhow::bail!(
+            "Invalid repository format. Expected owner/repo, got: {}",
+            repo_name
+        );
     }
     let (owner, repo) = (parts[0], parts[1]);
 
@@ -733,10 +748,13 @@ async fn cmd_apply(
         path.display(),
         report.findings.len(),
         ((report.total_estimated_duration_secs - report.optimized_duration_secs)
-            / report.total_estimated_duration_secs * 100.0),
+            / report.total_estimated_duration_secs
+            * 100.0),
         report.total_estimated_duration_secs,
         report.optimized_duration_secs,
-        report.findings.iter()
+        report
+            .findings
+            .iter()
             .take(5)
             .map(|f| format!("- **{:?}**: {}", f.severity, f.title))
             .collect::<Vec<_>>()
