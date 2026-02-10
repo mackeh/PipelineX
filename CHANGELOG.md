@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-02-10
+
+### Added
+- **Enhanced Dashboard GUI**: Complete UI overhaul with modern design principles
+  - **Dark Mode Support**: System-aware dark theme for better visibility
+  - **Glassmorphism Design**: Modern translucent UI elements for a polished look
+  - **Improved Layout**: Better organization of pipeline metrics and team management
+  - **Updated Visual Assets**: New high-resolution screenshots and DAG visualizations
+- **UI Interaction Improvements**: Smoother transitions and refined component behaviors in the dashboard
+
+### Changed
+- Updated documentation and README with latest UI previews and screenshots
+
 ## [2.0.0] - 2026-02-09
 
 ### 🎉 Phase 3 Complete!
