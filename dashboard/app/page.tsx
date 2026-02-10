@@ -154,7 +154,6 @@ export default function DashboardPage() {
   const [showCreateTeam, setShowCreateTeam] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");
   const [orgMetrics, setOrgMetrics] = useState<OrgLevelMetrics | null>(null);
-  const [loadingOrgMetrics, setLoadingOrgMetrics] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
@@ -351,7 +350,6 @@ export default function DashboardPage() {
   }, [newTeamName, loadTeams]);
 
   const loadOrgMetrics = useCallback(async () => {
-    setLoadingOrgMetrics(true);
     try {
       const response = await fetch("/api/org/metrics");
       type OrgMetricsResponse = { metrics?: OrgLevelMetrics; error?: string };
@@ -362,8 +360,6 @@ export default function DashboardPage() {
       setOrgMetrics(payload.metrics);
     } catch (metricsError) {
       console.error("Failed to load org metrics:", metricsError);
-    } finally {
-      setLoadingOrgMetrics(false);
     }
   }, []);
 
