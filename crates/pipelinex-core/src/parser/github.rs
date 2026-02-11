@@ -15,6 +15,11 @@ impl GitHubActionsParser {
         Self::parse(&content, path.to_string_lossy().to_string())
     }
 
+    /// Parse GitHub Actions YAML content with a synthetic source file name.
+    pub fn parse_content(content: &str, source_name: &str) -> Result<PipelineDag> {
+        Self::parse(content, source_name.to_string())
+    }
+
     /// Parse GitHub Actions YAML content into a Pipeline DAG.
     pub fn parse(content: &str, source_file: String) -> Result<PipelineDag> {
         let yaml: Value = serde_yaml::from_str(content).context("Failed to parse YAML")?;

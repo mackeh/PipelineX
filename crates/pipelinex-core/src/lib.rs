@@ -1,9 +1,12 @@
 pub mod analyzer;
+pub mod badge;
 pub mod cost;
+pub mod discovery;
 pub mod flaky_detector;
 pub mod graph;
 pub mod health_score;
 pub mod linter;
+pub mod mcp;
 pub mod migration;
 pub mod multi_repo;
 pub mod optimizer;
@@ -11,8 +14,11 @@ pub mod parser;
 pub mod plugins;
 pub mod policy;
 pub mod providers;
+pub mod redact;
 pub mod runner_sizing;
+pub mod sbom;
 pub mod security;
+pub mod signing;
 pub mod simulator;
 pub mod test_selector;
 
@@ -36,5 +42,7 @@ pub use plugins::{
 };
 pub use policy::{check_policy, load_policy, PolicyConfig, PolicyReport};
 pub use runner_sizing::{profile_pipeline as profile_runner_sizing, RunnerSizingReport};
+pub use sbom::generate_sbom;
 pub use security::scan as security_scan;
+pub use signing::{generate_keypair, sign_report, verify_report};
 pub use test_selector::{TestSelection, TestSelector, TestSelectorConfig};

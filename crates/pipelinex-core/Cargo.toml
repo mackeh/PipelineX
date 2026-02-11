@@ -20,3 +20,9 @@ reqwest = { workspace = true }
 chrono = { workspace = true }
 strsim = { workspace = true }
 toml = { workspace = true }
+ed25519-dalek = { workspace = true }
+rand = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
