@@ -21,3 +21,7 @@ similar = { workspace = true }
 glob = { workspace = true }
 tokio = { workspace = true }
 regex = { workspace = true }
+clap_complete = { workspace = true }
+notify = { workspace = true }
+toml = { workspace = true }
+chrono = { workspace = true }

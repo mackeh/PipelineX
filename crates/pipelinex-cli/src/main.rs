@@ -1,7 +1,7 @@
 mod display;
 
 use anyhow::{Context, Result};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, Parser, Subcommand};
 use pipelinex_core::analyzer;
 use pipelinex_core::flaky_detector::FlakyDetector;
 use pipelinex_core::github_actions_to_gitlab_ci;
@@ -259,6 +259,101 @@ enum Commands {
         #[command(subcommand)]
         command: PluginCommands,
     },
+
+    /// Generate shell completions for Bash, Zsh, Fish, or PowerShell
+    Completions {
+        /// Shell to generate completions for
+        #[arg(value_enum)]
+        shell: clap_complete::Shell,
+    },
+
+    /// Auto-detect CI platform and generate initial configuration
+    Init {
+        /// Directory to scan for CI configs
+        #[arg(default_value = ".")]
+        path: PathBuf,
+
+        /// Output path for generated config
+        #[arg(short, long, default_value = ".pipelinex/config.toml")]
+        output: PathBuf,
+    },
+
+    /// Compare two pipeline configurations
+    Compare {
+        /// First pipeline config file
+        file_a: PathBuf,
+
+        /// Second pipeline config file
+        file_b: PathBuf,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+
+    /// Watch pipeline configs for changes and re-analyze on save
+    Watch {
+        /// Path to watch (file or directory)
+        #[arg(default_value = ".github/workflows/")]
+        path: PathBuf,
+
+        /// Output format for analysis
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+
+    /// Lint CI config for syntax errors, deprecations, and typos
+    Lint {
+        /// Path to workflow file or directory
+        #[arg(default_value = ".github/workflows/")]
+        path: PathBuf,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+
+    /// Run security scan on pipeline configs (secrets, permissions, injection, supply chain)
+    Security {
+        /// Path to workflow file or directory
+        #[arg(default_value = ".github/workflows/")]
+        path: PathBuf,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+
+    /// Check pipeline configs against organisational policy rules
+    Policy {
+        #[command(subcommand)]
+        command: PolicyCommands,
+    },
+}
+
+#[derive(Subcommand)]
+enum PolicyCommands {
+    /// Check pipeline configs against a policy file
+    Check {
+        /// Path to workflow file or directory
+        #[arg(default_value = ".github/workflows/")]
+        path: PathBuf,
+
+        /// Path to policy file
+        #[arg(short = 'c', long, default_value = ".pipelinex/policy.toml")]
+        policy: PathBuf,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+
+    /// Generate a starter policy file
+    Init {
+        /// Path for the new policy file
+        #[arg(default_value = ".pipelinex/policy.toml")]
+        path: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -347,6 +442,21 @@ async fn main() -> Result<()> {
         Commands::MultiRepo { path, format } => cmd_multi_repo(&path, &format),
         Commands::RightSize { path, format } => cmd_right_size(&path, &format),
         Commands::Plugins { command } => cmd_plugins(command),
+        Commands::Completions { shell } => {
+            let mut cmd = Cli::command();
+            clap_complete::generate(shell, &mut cmd, "pipelinex", &mut std::io::stdout());
+            Ok(())
+        }
+        Commands::Init { path, output } => cmd_init(&path, &output),
+        Commands::Compare {
+            file_a,
+            file_b,
+            format,
+        } => cmd_compare(&file_a, &file_b, &format),
+        Commands::Watch { path, format } => cmd_watch(&path, &format),
+        Commands::Lint { path, format } => cmd_lint(&path, &format),
+        Commands::Security { path, format } => cmd_security(&path, &format),
+        Commands::Policy { command } => cmd_policy(command),
     }
 }
 
@@ -525,6 +635,9 @@ fn cmd_analyze(path: &Path, format: &str) -> Result<()> {
                 let html =
                     pipelinex_core::analyzer::html_report::generate_html_report(&report, &dag);
                 println!("{}", html);
+            }
+            "markdown" | "md" => {
+                print!("{}", display::format_markdown_report(&report));
             }
             _ => {
                 display::print_analysis_report(&report);
@@ -1242,6 +1355,354 @@ fn cmd_right_size(path: &Path, format: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn cmd_init(scan_path: &Path, output: &Path) -> Result<()> {
+    println!("PipelineX Init — Scanning for CI configurations...");
+    println!();
+
+    // Auto-detect CI platforms
+    let detections: Vec<(&str, &str)> = vec![
+        (".github/workflows/", "github-actions"),
+        (".gitlab-ci.yml", "gitlab-ci"),
+        (".gitlab-ci.yaml", "gitlab-ci"),
+        ("Jenkinsfile", "jenkins"),
+        (".circleci/config.yml", "circleci"),
+        (".circleci/config.yaml", "circleci"),
+        ("bitbucket-pipelines.yml", "bitbucket"),
+        ("bitbucket-pipelines.yaml", "bitbucket"),
+        ("azure-pipelines.yml", "azure-pipelines"),
+        ("azure-pipelines.yaml", "azure-pipelines"),
+        (".buildkite/pipeline.yml", "buildkite"),
+        (".buildkite/pipeline.yaml", "buildkite"),
+    ];
+
+    let mut detected = Vec::new();
+    for (path, provider) in &detections {
+        let full = scan_path.join(path);
+        if full.exists() {
+            detected.push((*provider, full));
+        }
+    }
+
+    if detected.is_empty() {
+        println!("  No CI configurations found in '{}'.", scan_path.display());
+        println!("  Run this command from your project root directory.");
+        return Ok(());
+    }
+
+    println!("  Detected CI platforms:");
+    let mut seen_providers = std::collections::HashSet::new();
+    for (provider, path) in &detected {
+        if seen_providers.insert(*provider) {
+            println!("    - {} ({})", provider, path.display());
+        }
+    }
+    println!();
+
+    // Generate config file
+    let primary_provider = detected[0].0;
+    let config_content = format!(
+        r#"# PipelineX Configuration
+# Generated by `pipelinex init`
+
+[general]
+provider = "{}"
+severity_threshold = "medium"
+output_format = "text"
+
+[cost]
+runs_per_month = 500
+team_size = 10
+hourly_rate = 150.0
+
+[analysis]
+# Enable security scanning
+security_scan = true
+# Enable lint checking
+lint = true
+"#,
+        primary_provider,
+    );
+
+    // Create parent directory
+    if let Some(parent) = output.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("Failed to create directory '{}'", parent.display()))?;
+    }
+
+    std::fs::write(output, &config_content)
+        .with_context(|| format!("Failed to write config to '{}'", output.display()))?;
+
+    println!("  Config written to: {}", output.display());
+    println!();
+    println!("  Next steps:");
+    println!("    pipelinex analyze    — Analyze your pipelines");
+    println!("    pipelinex lint       — Lint your CI configs");
+    println!("    pipelinex security   — Run security scan");
+    println!();
+
+    Ok(())
+}
+
+fn cmd_compare(file_a: &Path, file_b: &Path, format: &str) -> Result<()> {
+    if !file_a.is_file() {
+        anyhow::bail!("'{}' is not a file.", file_a.display());
+    }
+    if !file_b.is_file() {
+        anyhow::bail!("'{}' is not a file.", file_b.display());
+    }
+
+    let dag_a = parse_pipeline(file_a)?;
+    let dag_b = parse_pipeline(file_b)?;
+    let report_a = analyzer::analyze(&dag_a);
+    let report_b = analyzer::analyze(&dag_b);
+
+    match format {
+        "json" => {
+            #[derive(serde::Serialize)]
+            struct CompareOutput {
+                file_a: String,
+                file_b: String,
+                report_a: pipelinex_core::AnalysisReport,
+                report_b: pipelinex_core::AnalysisReport,
+                duration_delta_secs: f64,
+                findings_delta: i64,
+            }
+
+            let output = CompareOutput {
+                file_a: file_a.display().to_string(),
+                file_b: file_b.display().to_string(),
+                duration_delta_secs: report_b.total_estimated_duration_secs
+                    - report_a.total_estimated_duration_secs,
+                findings_delta: report_b.findings.len() as i64 - report_a.findings.len() as i64,
+                report_a,
+                report_b,
+            };
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        }
+        _ => {
+            display::print_comparison(
+                &report_a,
+                &report_b,
+                &file_a.display().to_string(),
+                &file_b.display().to_string(),
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_watch(path: &Path, format: &str) -> Result<()> {
+    use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
+    use std::sync::mpsc;
+    use std::time::{Duration, Instant};
+
+    let format = format.to_string();
+    let watch_path = if path.is_file() {
+        path.parent().unwrap_or(path).to_path_buf()
+    } else {
+        path.to_path_buf()
+    };
+
+    if !watch_path.exists() {
+        anyhow::bail!("Watch path '{}' does not exist", watch_path.display());
+    }
+
+    println!(
+        "PipelineX Watch — Monitoring {} for changes (Ctrl+C to stop)",
+        watch_path.display()
+    );
+    println!();
+
+    // Do an initial analysis
+    let _ = run_analysis_for_watch(path, &format);
+
+    let (tx, rx) = mpsc::channel::<Result<Event, notify::Error>>();
+    let mut watcher =
+        RecommendedWatcher::new(tx, Config::default()).context("Failed to create file watcher")?;
+
+    watcher
+        .watch(&watch_path, RecursiveMode::Recursive)
+        .context("Failed to start watching")?;
+
+    let mut last_run = Instant::now();
+    let debounce = Duration::from_millis(500);
+
+    for event in rx {
+        match event {
+            Ok(event) => {
+                let is_relevant = event.paths.iter().any(|p| {
+                    let ext = p.extension().and_then(|e| e.to_str());
+                    matches!(ext, Some("yml") | Some("yaml") | Some("json"))
+                });
+
+                if is_relevant && last_run.elapsed() > debounce {
+                    last_run = Instant::now();
+                    // Clear screen
+                    print!("\x1b[2J\x1b[H");
+                    println!(
+                        "[{}] Change detected, re-analysing...",
+                        chrono::Local::now().format("%H:%M:%S")
+                    );
+                    println!();
+                    let _ = run_analysis_for_watch(path, &format);
+                }
+            }
+            Err(e) => {
+                eprintln!("Watch error: {:?}", e);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn run_analysis_for_watch(path: &Path, format: &str) -> Result<()> {
+    let files = discover_workflow_files(path)?;
+    for file in &files {
+        match parse_pipeline(file) {
+            Ok(dag) => {
+                let report = analyzer::analyze(&dag);
+                match format {
+                    "json" => {
+                        let json = serde_json::to_string_pretty(&report)?;
+                        println!("{}", json);
+                    }
+                    "markdown" | "md" => {
+                        print!("{}", display::format_markdown_report(&report));
+                    }
+                    _ => {
+                        display::print_analysis_report(&report);
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Error parsing {}: {}", file.display(), e);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn cmd_lint(path: &Path, format: &str) -> Result<()> {
+    let files = discover_workflow_files(path)?;
+
+    if files.is_empty() {
+        anyhow::bail!("No workflow files found at '{}'", path.display());
+    }
+
+    let mut exit_code = 0;
+
+    for file in &files {
+        let content = std::fs::read_to_string(file)
+            .with_context(|| format!("Failed to read '{}'", file.display()))?;
+
+        let dag = parse_pipeline(file)?;
+        let report = pipelinex_core::linter::lint(&content, &dag);
+
+        if report.exit_code() > exit_code {
+            exit_code = report.exit_code();
+        }
+
+        match format {
+            "json" => {
+                let json = serde_json::to_string_pretty(&report)?;
+                println!("{}", json);
+            }
+            _ => {
+                display::print_lint_report(&report);
+            }
+        }
+    }
+
+    if exit_code == 2 {
+        anyhow::bail!("Lint check failed with errors");
+    }
+
+    Ok(())
+}
+
+fn cmd_security(path: &Path, format: &str) -> Result<()> {
+    let files = discover_workflow_files(path)?;
+
+    if files.is_empty() {
+        anyhow::bail!("No workflow files found at '{}'", path.display());
+    }
+
+    for file in &files {
+        let dag = parse_pipeline(file)?;
+        let findings = pipelinex_core::security::scan(&dag);
+
+        match format {
+            "json" => {
+                let json = serde_json::to_string_pretty(&findings)?;
+                println!("{}", json);
+            }
+            _ => {
+                display::print_security_report(&findings, &file.display().to_string());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_policy(command: PolicyCommands) -> Result<()> {
+    match command {
+        PolicyCommands::Init { path } => {
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent)?;
+            }
+            let content = pipelinex_core::policy::generate_default_policy();
+            std::fs::write(&path, content)?;
+            println!("Policy file created: {}", path.display());
+            println!("Edit this file to configure your organisation's CI policy rules.");
+            Ok(())
+        }
+        PolicyCommands::Check {
+            path,
+            policy: policy_path,
+            format,
+        } => {
+            let policy = pipelinex_core::load_policy(&policy_path).with_context(|| {
+                format!("Failed to load policy from '{}'", policy_path.display())
+            })?;
+
+            let files = discover_workflow_files(&path)?;
+            if files.is_empty() {
+                anyhow::bail!("No workflow files found at '{}'", path.display());
+            }
+
+            let mut any_failed = false;
+
+            for file in &files {
+                let dag = parse_pipeline(file)?;
+                let report = pipelinex_core::check_policy(&dag, &policy);
+
+                if !report.passed {
+                    any_failed = true;
+                }
+
+                match format.as_str() {
+                    "json" => {
+                        let json = serde_json::to_string_pretty(&report)?;
+                        println!("{}", json);
+                    }
+                    _ => {
+                        display::print_policy_report(&report);
+                    }
+                }
+            }
+
+            if any_failed {
+                anyhow::bail!("Policy check failed");
+            }
+
+            Ok(())
+        }
+    }
 }
 
 fn cmd_plugins(command: PluginCommands) -> Result<()> {

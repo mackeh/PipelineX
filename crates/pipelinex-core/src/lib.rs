@@ -3,18 +3,22 @@ pub mod cost;
 pub mod flaky_detector;
 pub mod graph;
 pub mod health_score;
+pub mod linter;
 pub mod migration;
 pub mod multi_repo;
 pub mod optimizer;
 pub mod parser;
 pub mod plugins;
+pub mod policy;
 pub mod providers;
 pub mod runner_sizing;
+pub mod security;
 pub mod simulator;
 pub mod test_selector;
 
 pub use analyzer::report::{AnalysisReport, Finding, Severity};
 pub use flaky_detector::{FlakyCategory, FlakyDetector, FlakyReport, FlakyTest};
+pub use linter::{lint, LintReport};
 pub use migration::{github_actions_to_gitlab_ci, MigrationResult};
 pub use multi_repo::{analyze_multi_repo, MultiRepoReport, RepoPipeline};
 pub use optimizer::Optimizer;
@@ -30,5 +34,7 @@ pub use parser::jenkins::JenkinsParser;
 pub use plugins::{
     list_external_optimizer_plugins, run_external_analyzer_plugins, scaffold_manifest,
 };
+pub use policy::{check_policy, load_policy, PolicyConfig, PolicyReport};
 pub use runner_sizing::{profile_pipeline as profile_runner_sizing, RunnerSizingReport};
+pub use security::scan as security_scan;
 pub use test_selector::{TestSelection, TestSelector, TestSelectorConfig};
