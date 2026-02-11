@@ -41,9 +41,21 @@ enum Commands {
         #[arg(default_value = ".github/workflows/")]
         path: PathBuf,
 
-        /// Output format (text, json, sarif, html)
+        /// Output format (text, json, sarif, html, markdown)
         #[arg(short, long, default_value = "text")]
         format: String,
+
+        /// Disable all network calls (offline mode for air-gapped environments)
+        #[arg(long)]
+        offline: bool,
+
+        /// Redact sensitive information from output (for sharing with external parties)
+        #[arg(long)]
+        redact: bool,
+
+        /// Sign the JSON output with an Ed25519 private key (hex or file path)
+        #[arg(long)]
+        sign: Option<String>,
     },
 
     /// Generate an optimized pipeline configuration
@@ -329,6 +341,71 @@ enum Commands {
         #[command(subcommand)]
         command: PolicyCommands,
     },
+
+    /// Discover and analyze all CI configs across a monorepo
+    Monorepo {
+        /// Root directory to scan
+        #[arg(default_value = ".")]
+        path: PathBuf,
+
+        /// Maximum directory depth to scan
+        #[arg(long, default_value = "5")]
+        depth: usize,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+
+    /// Generate a CI Software Bill of Materials (CycloneDX SBOM)
+    Sbom {
+        /// Path to workflow file or directory
+        #[arg(default_value = ".github/workflows/")]
+        path: PathBuf,
+
+        /// Output file (stdout if not specified)
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+
+    /// Generate a pipeline health score badge for READMEs
+    Badge {
+        /// Path to workflow file
+        path: PathBuf,
+
+        /// Output format (markdown, json, url)
+        #[arg(short, long, default_value = "markdown")]
+        format: String,
+    },
+
+    /// Ed25519 key management for report signing
+    Keys {
+        #[command(subcommand)]
+        command: KeysCommands,
+    },
+
+    /// Verify a signed PipelineX report
+    Verify {
+        /// Path to signed report JSON file
+        report: PathBuf,
+
+        /// Public key (hex string) or path to key file
+        #[arg(long)]
+        key: String,
+    },
+
+    /// Start MCP (Model Context Protocol) server for AI tool integration
+    McpServer,
+}
+
+#[derive(Subcommand)]
+enum KeysCommands {
+    /// Generate a new Ed25519 keypair for report signing
+    Generate {
+        /// Output directory for key files
+        #[arg(default_value = ".pipelinex")]
+        path: PathBuf,
+    },
 }
 
 #[derive(Subcommand)]
@@ -382,7 +459,13 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Analyze { path, format } => cmd_analyze(&path, &format),
+        Commands::Analyze {
+            path,
+            format,
+            offline: _offline,
+            redact,
+            sign,
+        } => cmd_analyze(&path, &format, redact, sign.as_deref()),
         Commands::Optimize { path, output, diff } => cmd_optimize(&path, output.as_deref(), diff),
         Commands::Diff { path } => cmd_diff(&path),
         Commands::Apply {
@@ -457,6 +540,19 @@ async fn main() -> Result<()> {
         Commands::Lint { path, format } => cmd_lint(&path, &format),
         Commands::Security { path, format } => cmd_security(&path, &format),
         Commands::Policy { command } => cmd_policy(command),
+        Commands::Monorepo {
+            path,
+            depth,
+            format,
+        } => cmd_monorepo_discover(&path, depth, &format),
+        Commands::Sbom { path, output } => cmd_sbom(&path, output.as_deref()),
+        Commands::Badge { path, format } => cmd_badge(&path, &format),
+        Commands::Keys { command } => cmd_keys(command),
+        Commands::Verify { report, key } => cmd_verify(&report, &key),
+        Commands::McpServer => {
+            pipelinex_core::mcp::run_stdio_server()?;
+            Ok(())
+        }
     }
 }
 
@@ -606,7 +702,7 @@ fn discover_repo_pipeline_files(repo_root: &Path) -> Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-fn cmd_analyze(path: &Path, format: &str) -> Result<()> {
+fn cmd_analyze(path: &Path, format: &str, redact: bool, sign_key: Option<&str>) -> Result<()> {
     let files = discover_workflow_files(path)?;
 
     if files.is_empty() {
@@ -619,12 +715,22 @@ fn cmd_analyze(path: &Path, format: &str) -> Result<()> {
 
     for file in &files {
         let dag = parse_pipeline(file)?;
-        let report = analyzer::analyze(&dag);
+        let mut report = analyzer::analyze(&dag);
+
+        if redact {
+            report = pipelinex_core::redact::redact_report(&report);
+        }
 
         match format {
             "json" => {
                 let json = serde_json::to_string_pretty(&report)?;
-                println!("{}", json);
+                if let Some(key) = sign_key {
+                    let key_hex = read_key_material(key)?;
+                    let signed = pipelinex_core::sign_report(&json, &key_hex)?;
+                    println!("{}", serde_json::to_string_pretty(&signed)?);
+                } else {
+                    println!("{}", json);
+                }
             }
             "sarif" => {
                 let sarif = pipelinex_core::analyzer::sarif::to_sarif(&report);
@@ -646,6 +752,22 @@ fn cmd_analyze(path: &Path, format: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn read_key_material(key_or_path: &str) -> Result<String> {
+    // If it looks like a hex key (64 chars, all hex), use directly
+    if key_or_path.len() == 64 && key_or_path.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Ok(key_or_path.to_string());
+    }
+    // Otherwise try to read as file
+    let path = Path::new(key_or_path);
+    if path.is_file() {
+        let content = std::fs::read_to_string(path)
+            .with_context(|| format!("Failed to read key file: {}", path.display()))?;
+        Ok(content.trim().to_string())
+    } else {
+        Ok(key_or_path.to_string())
+    }
 }
 
 fn cmd_optimize(path: &PathBuf, output: Option<&std::path::Path>, show_diff: bool) -> Result<()> {
@@ -1702,6 +1824,188 @@ fn cmd_policy(command: PolicyCommands) -> Result<()> {
 
             Ok(())
         }
+    }
+}
+
+fn cmd_monorepo_discover(path: &Path, max_depth: usize, format: &str) -> Result<()> {
+    let discovered = pipelinex_core::discovery::discover_monorepo(path, max_depth)?;
+
+    if discovered.is_empty() {
+        anyhow::bail!(
+            "No CI pipeline files found under '{}' (depth {})",
+            path.display(),
+            max_depth
+        );
+    }
+
+    let summary = pipelinex_core::discovery::aggregate_discovery(path, &discovered);
+
+    if format == "json" {
+        println!("{}", serde_json::to_string_pretty(&summary)?);
+        return Ok(());
+    }
+
+    println!("PipelineX Monorepo Discovery — {}", path.display());
+    println!(
+        "  Found {} pipeline files across {} packages",
+        summary.total_pipeline_files,
+        summary.packages.len()
+    );
+    println!();
+
+    // Now analyze each discovered file
+    let mut total_findings = 0;
+    let mut total_jobs = 0;
+
+    for pipeline in &discovered {
+        match parse_pipeline(&pipeline.file_path) {
+            Ok(dag) => {
+                let report = analyzer::analyze(&dag);
+                total_findings += report.findings.len();
+                total_jobs += report.job_count;
+                println!(
+                    "  [{}] {} — {} jobs, {} findings",
+                    pipeline.package_name,
+                    pipeline.relative_path,
+                    report.job_count,
+                    report.findings.len()
+                );
+            }
+            Err(e) => {
+                println!(
+                    "  [{}] {} — Error: {}",
+                    pipeline.package_name, pipeline.relative_path, e
+                );
+            }
+        }
+    }
+
+    println!();
+    println!(
+        "  Total: {} jobs, {} findings across {} files",
+        total_jobs,
+        total_findings,
+        discovered.len()
+    );
+    println!();
+
+    Ok(())
+}
+
+fn cmd_sbom(path: &Path, output: Option<&std::path::Path>) -> Result<()> {
+    let files = discover_workflow_files(path)?;
+    if files.is_empty() {
+        anyhow::bail!("No workflow files found at '{}'", path.display());
+    }
+
+    let mut dags = Vec::new();
+    for file in &files {
+        dags.push(parse_pipeline(file)?);
+    }
+
+    let dag_refs: Vec<&pipelinex_core::PipelineDag> = dags.iter().collect();
+    let sbom = pipelinex_core::generate_sbom(&dag_refs);
+    let json = serde_json::to_string_pretty(&sbom)?;
+
+    match output {
+        Some(out_path) => {
+            std::fs::write(out_path, &json)?;
+            println!("SBOM written to {}", out_path.display());
+            println!(
+                "  Components: {} | Format: CycloneDX {}",
+                sbom.components.len(),
+                sbom.spec_version
+            );
+        }
+        None => {
+            println!("{}", json);
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_badge(path: &Path, format: &str) -> Result<()> {
+    if !path.is_file() {
+        anyhow::bail!("'{}' is not a file.", path.display());
+    }
+
+    let dag = parse_pipeline(path)?;
+    let report = analyzer::analyze(&dag);
+    let badge = pipelinex_core::badge::generate_badge(&report);
+
+    match format {
+        "json" => {
+            println!("{}", serde_json::to_string_pretty(&badge)?);
+        }
+        "url" => {
+            println!("{}", badge.shields_url);
+        }
+        _ => {
+            println!("{}", badge.markdown);
+            println!();
+            println!(
+                "  Score: {}/100 ({}) | {:.0}% optimized",
+                badge.score, badge.grade, badge.optimization_pct
+            );
+            println!();
+            println!("  Add the line above to your README.md");
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_keys(command: KeysCommands) -> Result<()> {
+    match command {
+        KeysCommands::Generate { path } => {
+            std::fs::create_dir_all(&path)?;
+
+            let (private_key, public_key) = pipelinex_core::generate_keypair()?;
+
+            let private_path = path.join("private.key");
+            let public_path = path.join("public.key");
+
+            std::fs::write(&private_path, &private_key)?;
+            std::fs::write(&public_path, &public_key)?;
+
+            println!("Ed25519 keypair generated:");
+            println!("  Private key: {}", private_path.display());
+            println!("  Public key:  {}", public_path.display());
+            println!();
+            println!(
+                "Sign reports:  pipelinex analyze ci.yml --format json --sign {}",
+                private_path.display()
+            );
+            println!(
+                "Verify:        pipelinex verify report.json --key {}",
+                public_path.display()
+            );
+            println!();
+            println!("Keep your private key secure. Share only the public key.");
+
+            Ok(())
+        }
+    }
+}
+
+fn cmd_verify(report_path: &Path, key: &str) -> Result<()> {
+    let content = std::fs::read_to_string(report_path)
+        .with_context(|| format!("Failed to read report: {}", report_path.display()))?;
+
+    let signed: pipelinex_core::signing::SignedReport =
+        serde_json::from_str(&content).context("Failed to parse signed report JSON")?;
+
+    let public_key = read_key_material(key)?;
+
+    let valid = pipelinex_core::verify_report(&signed, &public_key)?;
+
+    if valid {
+        println!("Signature VALID — report is authentic and untampered.");
+        std::process::exit(0);
+    } else {
+        println!("Signature INVALID — report may have been tampered with!");
+        std::process::exit(1);
     }
 }
 
