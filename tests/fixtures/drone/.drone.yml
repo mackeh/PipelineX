@@ -1,0 +1,31 @@
+kind: pipeline
+type: docker
+name: ci
+
+steps:
+  - name: clone
+    image: alpine/git
+    commands:
+      - git clone https://example.com/repo.git
+
+  - name: lint
+    image: node:20
+    commands:
+      - npm ci
+      - npm run lint
+    depends_on:
+      - clone
+
+  - name: test
+    image: node:20
+    commands:
+      - npm ci
+      - npm test
+    depends_on:
+      - clone
+
+  - name: deploy
+    image: plugins/docker
+    depends_on:
+      - lint
+      - test

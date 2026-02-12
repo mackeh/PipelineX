@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-02-12
+
+### Added
+- New CI parser coverage for:
+  - Argo Workflows
+  - Tekton Pipelines
+  - Drone CI / Woodpecker CI
+- New `pipelinex explain` command for plain-English finding explanations with optional LLM backends and template fallback.
+- New `pipelinex what-if` command for scenario simulation (dependency/cache/runner/job/duration changes) with impact summaries.
+- New fixtures and integration coverage for Argo, Tekton, and Drone workflows.
+- New guide: `docs/EXPLAIN_WHATIF.md`.
+
+### Changed
+- Improved parser robustness for Argo/Tekton multi-document YAML by selecting the best matching CRD document.
+- Improved provider auto-detection to avoid false Argo matches on paths like `Cargo.*`.
+- Expanded monorepo file discovery to include `.drone.yml`, `.woodpecker.yml`, and common Argo/Tekton directories.
+- Updated README, quickstart, and roadmap status to reflect 11 supported CI platforms and new CLI capabilities.
+
 ## [2.1.1] - 2026-02-10
 
 ### Fixed

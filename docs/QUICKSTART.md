@@ -64,6 +64,15 @@ pipelinex analyze codepipeline.json
 
 # Buildkite
 pipelinex analyze .buildkite/pipeline.yml
+
+# Drone CI / Woodpecker
+pipelinex analyze .drone.yml
+
+# Tekton Pipelines
+pipelinex analyze .tekton/pipeline.yaml
+
+# Argo Workflows
+pipelinex analyze argo/workflow.yaml
 ```
 
 **Example output:**
@@ -455,6 +464,8 @@ ls .github/workflows/*.yml | xargs -P 4 -I {} pipelinex analyze {}
 | `pipelinex migrate <file> --to gitlab-ci` | Convert GitHub Actions workflow to GitLab CI |
 | `pipelinex multi-repo <dir>` | Analyze cross-repo orchestration and monorepo risks |
 | `pipelinex right-size <file-or-dir>` | Recommend runner size changes from inferred resource profiles |
+| `pipelinex explain <file>` | Explain findings with impact and clear remediation guidance |
+| `pipelinex what-if <file> --modify "<change>"` | Simulate DAG/config changes before editing YAML |
 | `pipelinex --help` | Show all commands |
 
 ---

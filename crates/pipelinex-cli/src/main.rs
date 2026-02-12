@@ -7,14 +7,17 @@ use pipelinex_core::flaky_detector::FlakyDetector;
 use pipelinex_core::github_actions_to_gitlab_ci;
 use pipelinex_core::multi_repo::{analyze_multi_repo, RepoPipeline};
 use pipelinex_core::optimizer::Optimizer;
+use pipelinex_core::parser::argo::ArgoWorkflowsParser;
 use pipelinex_core::parser::aws_codepipeline::AwsCodePipelineParser;
 use pipelinex_core::parser::azure::AzurePipelinesParser;
 use pipelinex_core::parser::bitbucket::BitbucketParser;
 use pipelinex_core::parser::buildkite::BuildkiteParser;
 use pipelinex_core::parser::circleci::CircleCIParser;
+use pipelinex_core::parser::drone::DroneParser;
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
 use pipelinex_core::parser::jenkins::JenkinsParser;
+use pipelinex_core::parser::tekton::TektonParser;
 use pipelinex_core::plugins;
 use pipelinex_core::profile_runner_sizing;
 use pipelinex_core::providers::GitHubClient;
@@ -396,6 +399,34 @@ enum Commands {
 
     /// Start MCP (Model Context Protocol) server for AI tool integration
     McpServer,
+
+    /// Explain analysis findings in plain English (LLM-powered or template fallback)
+    Explain {
+        /// Path to workflow file
+        path: PathBuf,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+
+        /// Estimated pipeline runs per month (for impact calculation)
+        #[arg(long, default_value = "500")]
+        runs_per_month: u32,
+    },
+
+    /// What-if simulator: explore optimization impact by modifying the pipeline
+    WhatIf {
+        /// Path to workflow file
+        path: PathBuf,
+
+        /// Modifications to apply (e.g., "add-cache build 120", "remove-dep test->deploy")
+        #[arg(short, long)]
+        modify: Vec<String>,
+
+        /// Output format (text, json)
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -553,6 +584,16 @@ async fn main() -> Result<()> {
             pipelinex_core::mcp::run_stdio_server()?;
             Ok(())
         }
+        Commands::Explain {
+            path,
+            format,
+            runs_per_month,
+        } => cmd_explain(&path, &format, runs_per_month).await,
+        Commands::WhatIf {
+            path,
+            modify,
+            format,
+        } => cmd_whatif(&path, &modify, &format),
     }
 }
 
@@ -601,11 +642,50 @@ fn parse_pipeline(path: &std::path::Path) -> Result<pipelinex_core::PipelineDag>
     {
         BuildkiteParser::parse_file(path)
             .with_context(|| format!("Failed to parse Buildkite pipeline: {}", path.display()))
+    } else if filename == ".drone.yml"
+        || filename == ".drone.yaml"
+        || filename == ".woodpecker.yml"
+        || filename == ".woodpecker.yaml"
+        || path_str.contains("drone")
+        || path_str.contains("woodpecker")
+    {
+        DroneParser::parse_file(path)
+            .with_context(|| format!("Failed to parse Drone CI file: {}", path.display()))
+    } else if path_has_token(&path_str, "tekton") || is_tekton_content(path) {
+        TektonParser::parse_file(path)
+            .with_context(|| format!("Failed to parse Tekton file: {}", path.display()))
+    } else if path_has_token(&path_str, "argo")
+        || path_has_token(&path_str, "argoproj")
+        || is_argo_content(path)
+    {
+        ArgoWorkflowsParser::parse_file(path)
+            .with_context(|| format!("Failed to parse Argo Workflows file: {}", path.display()))
     } else {
         // Default to GitHub Actions
         GitHubActionsParser::parse_file(path)
             .with_context(|| format!("Failed to parse GitHub Actions file: {}", path.display()))
     }
+}
+
+/// Check if file content looks like a Tekton resource.
+fn is_tekton_content(path: &Path) -> bool {
+    std::fs::read_to_string(path)
+        .map(|c| c.contains("tekton.dev") || (c.contains("kind: Pipeline") && c.contains("tasks:")))
+        .unwrap_or(false)
+}
+
+/// Check if file content looks like an Argo Workflows resource.
+fn is_argo_content(path: &Path) -> bool {
+    std::fs::read_to_string(path)
+        .map(|c| {
+            c.contains("argoproj.io") || (c.contains("kind: Workflow") && c.contains("entrypoint:"))
+        })
+        .unwrap_or(false)
+}
+
+fn path_has_token(path: &str, token: &str) -> bool {
+    path.split(|c: char| !c.is_ascii_alphanumeric())
+        .any(|part| part.eq_ignore_ascii_case(token))
 }
 
 fn discover_workflow_files(path: &Path) -> Result<Vec<PathBuf>> {
@@ -666,6 +746,10 @@ fn discover_repo_pipeline_files(repo_root: &Path) -> Result<Vec<PathBuf>> {
     for fixed in [
         ".gitlab-ci.yml",
         ".gitlab-ci.yaml",
+        ".drone.yml",
+        ".drone.yaml",
+        ".woodpecker.yml",
+        ".woodpecker.yaml",
         "Jenkinsfile",
         "bitbucket-pipelines.yml",
         "bitbucket-pipelines.yaml",
@@ -691,6 +775,26 @@ fn discover_repo_pipeline_files(repo_root: &Path) -> Result<Vec<PathBuf>> {
         format!("{}/.github/workflows/*.yaml", repo_root.display()),
     ];
     for pattern in gh_patterns {
+        let entries = glob::glob(&pattern).context("Failed to read workflow glob pattern")?;
+        for path in entries.flatten() {
+            files.push(path);
+        }
+    }
+
+    let extra_patterns = [
+        format!("{}/.tekton/**/*.yml", repo_root.display()),
+        format!("{}/.tekton/**/*.yaml", repo_root.display()),
+        format!("{}/tekton/**/*.yml", repo_root.display()),
+        format!("{}/tekton/**/*.yaml", repo_root.display()),
+        format!("{}/.argo/**/*.yml", repo_root.display()),
+        format!("{}/.argo/**/*.yaml", repo_root.display()),
+        format!("{}/argo/**/*.yml", repo_root.display()),
+        format!("{}/argo/**/*.yaml", repo_root.display()),
+        format!("{}/argo-workflows/**/*.yml", repo_root.display()),
+        format!("{}/argo-workflows/**/*.yaml", repo_root.display()),
+    ];
+
+    for pattern in extra_patterns {
         let entries = glob::glob(&pattern).context("Failed to read workflow glob pattern")?;
         for path in entries.flatten() {
             files.push(path);
@@ -2007,6 +2111,108 @@ fn cmd_verify(report_path: &Path, key: &str) -> Result<()> {
         println!("Signature INVALID — report may have been tampered with!");
         std::process::exit(1);
     }
+}
+
+async fn cmd_explain(path: &Path, format: &str, runs_per_month: u32) -> Result<()> {
+    let files = discover_workflow_files(path)?;
+    if files.is_empty() {
+        anyhow::bail!("No workflow files found at '{}'", path.display());
+    }
+
+    let explainer = pipelinex_core::explainer::Explainer::from_env();
+
+    for file in &files {
+        let dag = parse_pipeline(file)?;
+        let report = analyzer::analyze(&dag);
+
+        if report.findings.is_empty() {
+            println!("No findings to explain for {}", file.display());
+            continue;
+        }
+
+        let mut context = pipelinex_core::explainer::PipelineContext::from_dag(&dag);
+        context.runs_per_month = runs_per_month;
+
+        let explanations = explainer.explain_all(&report.findings, &context).await;
+
+        match format {
+            "json" => {
+                println!("{}", serde_json::to_string_pretty(&explanations)?);
+            }
+            _ => {
+                println!();
+                println!(
+                    " PipelineX Explain — {} ({} findings)",
+                    file.display(),
+                    explanations.len()
+                );
+                println!();
+                print!(
+                    "{}",
+                    pipelinex_core::explainer::format_explanations(&explanations)
+                );
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_whatif(path: &Path, modifications: &[String], format: &str) -> Result<()> {
+    if !path.is_file() {
+        anyhow::bail!("'{}' is not a file.", path.display());
+    }
+
+    let dag = parse_pipeline(path)?;
+
+    if modifications.is_empty() {
+        // Show available jobs and help
+        println!();
+        println!(" PipelineX What-If Simulator");
+        println!();
+        println!(" Available jobs in {}:", path.display());
+        for job_id in dag.job_ids() {
+            let job = dag.get_job(&job_id).unwrap();
+            println!(
+                "   {} ({:.0}s, depends on: [{}])",
+                job_id,
+                job.estimated_duration_secs,
+                job.needs.join(", ")
+            );
+        }
+        println!();
+        println!(" Available modifications:");
+        println!("   --modify \"add-cache <job> [savings_secs]\"");
+        println!("   --modify \"remove-cache <job>\"");
+        println!("   --modify \"remove-dep <from>-><to>\"");
+        println!("   --modify \"add-dep <from>-><to>\"");
+        println!("   --modify \"remove-job <job>\"");
+        println!("   --modify \"set-duration <job> <seconds>\"");
+        println!("   --modify \"change-runner <job> <runner>\"");
+        println!();
+        println!(" Example:");
+        println!("   pipelinex what-if ci.yml --modify \"add-cache build 120\" --modify \"remove-dep lint->deploy\"");
+        println!();
+        return Ok(());
+    }
+
+    let mods: Vec<pipelinex_core::whatif::Modification> = modifications
+        .iter()
+        .map(|m| pipelinex_core::whatif::parse_modification(m))
+        .collect::<Result<Vec<_>>>()?;
+
+    let result = pipelinex_core::whatif::simulate(&dag, &mods);
+
+    match format {
+        "json" => {
+            println!("{}", serde_json::to_string_pretty(&result)?);
+        }
+        _ => {
+            display::print_whatif_result(&result);
+        }
+    }
+
+    Ok(())
 }
 
 fn cmd_plugins(command: PluginCommands) -> Result<()> {

@@ -1,14 +1,17 @@
 use pipelinex_core::analyzer;
 use pipelinex_core::optimizer::docker_opt;
 use pipelinex_core::optimizer::Optimizer;
+use pipelinex_core::parser::argo::ArgoWorkflowsParser;
 use pipelinex_core::parser::aws_codepipeline::AwsCodePipelineParser;
 use pipelinex_core::parser::azure::AzurePipelinesParser;
 use pipelinex_core::parser::bitbucket::BitbucketParser;
 use pipelinex_core::parser::buildkite::BuildkiteParser;
 use pipelinex_core::parser::circleci::CircleCIParser;
+use pipelinex_core::parser::drone::DroneParser;
 use pipelinex_core::parser::github::GitHubActionsParser;
 use pipelinex_core::parser::gitlab::GitLabCIParser;
 use pipelinex_core::parser::jenkins::JenkinsParser;
+use pipelinex_core::parser::tekton::TektonParser;
 use std::path::{Path, PathBuf};
 
 /// Get the workspace root (two levels up from CARGO_MANIFEST_DIR of pipelinex-core).
@@ -56,6 +59,18 @@ fn aws_codepipeline_fixture(name: &str) -> PathBuf {
 
 fn buildkite_fixture(name: &str) -> PathBuf {
     fixtures_dir().join("buildkite").join(name)
+}
+
+fn argo_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("argo").join(name)
+}
+
+fn tekton_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("tekton").join(name)
+}
+
+fn drone_fixture(name: &str) -> PathBuf {
+    fixtures_dir().join("drone").join(name)
 }
 
 // ─── GitHub Actions integration tests ───
@@ -527,4 +542,66 @@ fn test_buildkite_dependency_chain() {
 
     let deploy = dag.get_job("deploy").unwrap();
     assert_eq!(deploy.needs, vec!["unit-tests"]);
+}
+
+// ─── Argo / Tekton / Drone integration tests ───
+
+#[test]
+fn test_analyze_argo_workflow() {
+    let path = argo_fixture("workflow.yml");
+    let dag = ArgoWorkflowsParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.provider, "argo-workflows");
+    assert_eq!(report.job_count, 4);
+    assert!(report.max_parallelism >= 2);
+}
+
+#[test]
+fn test_parse_argo_multi_document_fixture() {
+    let path = argo_fixture("multi-doc.yaml");
+    let dag = ArgoWorkflowsParser::parse_file(&path).unwrap();
+
+    assert_eq!(dag.provider, "argo-workflows");
+    assert_eq!(dag.name, "argo-ci");
+    assert!(dag.get_job("build").is_some());
+    assert!(dag.get_job("test").is_some());
+}
+
+#[test]
+fn test_analyze_tekton_pipeline() {
+    let path = tekton_fixture("pipeline.yaml");
+    let dag = TektonParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.provider, "tekton");
+    assert_eq!(report.job_count, 4);
+
+    let deploy = dag.get_job("deploy").unwrap();
+    assert!(deploy.needs.contains(&"build".to_string()));
+    assert!(deploy.needs.contains(&"test".to_string()));
+}
+
+#[test]
+fn test_parse_tekton_multi_document_fixture() {
+    let path = tekton_fixture("multi-doc.yaml");
+    let dag = TektonParser::parse_file(&path).unwrap();
+
+    assert_eq!(dag.provider, "tekton");
+    assert_eq!(dag.name, "app-ci");
+    assert_eq!(dag.job_count(), 2);
+}
+
+#[test]
+fn test_analyze_drone_pipeline() {
+    let path = drone_fixture(".drone.yml");
+    let dag = DroneParser::parse_file(&path).unwrap();
+    let report = analyzer::analyze(&dag);
+
+    assert_eq!(report.provider, "drone");
+    assert_eq!(report.job_count, 4);
+    assert!(report.max_parallelism >= 2);
+
+    let deploy = dag.get_job("deploy").unwrap();
+    assert_eq!(deploy.needs.len(), 2);
 }

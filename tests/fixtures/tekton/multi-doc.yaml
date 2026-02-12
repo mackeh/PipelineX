@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: unit-tests
+spec:
+  steps:
+    - name: test
+      image: golang:1.21
+      script: |
+        go test ./...
+---
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: app-ci
+spec:
+  tasks:
+    - name: build
+      taskRef:
+        name: kaniko-build
+    - name: test
+      taskRef:
+        name: unit-tests
+      runAfter:
+        - build

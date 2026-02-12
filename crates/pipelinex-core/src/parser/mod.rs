@@ -1,9 +1,12 @@
+pub mod argo;
 pub mod aws_codepipeline;
 pub mod azure;
 pub mod bitbucket;
 pub mod buildkite;
 pub mod circleci;
 pub mod dag;
+pub mod drone;
 pub mod github;
 pub mod gitlab;
 pub mod jenkins;
+pub mod tekton;

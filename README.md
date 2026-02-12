@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/mackeh/PipelineX/actions/workflows/ci.yml/badge.svg)](https://github.com/mackeh/PipelineX/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platforms](https://img.shields.io/badge/platforms-8%20CI%20systems-success)](#supported-ci-platforms)
+[![Platforms](https://img.shields.io/badge/platforms-11%20CI%20systems-success)](#supported-ci-platforms)
 
 [Features](#-features) •
 [Quick Start](#-quick-start) •
@@ -43,7 +43,7 @@ Most of that time is wasted on:
 
 ### 🔍 **Multi-Platform Analysis**
 
-Supports 8 major CI systems:
+Supports 11 major CI systems:
 
 - GitHub Actions
 - GitLab CI
@@ -53,6 +53,9 @@ Supports 8 major CI systems:
 - Azure Pipelines
 - AWS CodePipeline
 - Buildkite
+- Drone CI / Woodpecker CI
+- Tekton Pipelines
+- Argo Workflows
 
 Analyzes YAML/Groovy configs offline — no account or API needed.
 
@@ -564,18 +567,20 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 
 ## 🏗️ Supported CI Platforms
 
-| Platform                | Status             | Features                                                   |
-| ----------------------- | ------------------ | ---------------------------------------------------------- |
-| **GitHub Actions**      | ✅ Fully Supported | Workflows, jobs, matrices, caches, artifacts, path filters |
-| **GitLab CI**           | ✅ Fully Supported | Stages, needs, parallel, rules, hidden jobs, DAG           |
-| **Jenkins**             | ✅ Fully Supported | Declarative pipelines, stages, parallel, agents            |
-| **CircleCI**            | ✅ Fully Supported | Workflows, jobs, executors, orbs, caches                   |
-| **Bitbucket Pipelines** | ✅ Fully Supported | Pipelines, parallel, deployments, services                 |
-| **Azure Pipelines**     | ✅ Fully Supported | Stages, jobs, dependencies, templates                      |
-| **AWS CodePipeline**    | ✅ Fully Supported | Stages, actions, runOrder, artifacts                       |
-| **Buildkite**           | ✅ Fully Supported | Steps, depends_on, wait/block barriers, plugins, artifacts |
-| Drone CI                | 🔜 Planned         | Steps, services, volumes                                   |
-| Travis CI               | 🔜 Planned         | Stages, jobs, matrix                                       |
+| Platform                  | Status             | Features                                                   |
+| ------------------------- | ------------------ | ---------------------------------------------------------- |
+| **GitHub Actions**        | ✅ Fully Supported | Workflows, jobs, matrices, caches, artifacts, path filters |
+| **GitLab CI**             | ✅ Fully Supported | Stages, needs, parallel, rules, hidden jobs, DAG           |
+| **Jenkins**               | ✅ Fully Supported | Declarative pipelines, stages, parallel, agents            |
+| **CircleCI**              | ✅ Fully Supported | Workflows, jobs, executors, orbs, caches                   |
+| **Bitbucket Pipelines**   | ✅ Fully Supported | Pipelines, parallel, deployments, services                 |
+| **Azure Pipelines**       | ✅ Fully Supported | Stages, jobs, dependencies, templates                      |
+| **AWS CodePipeline**      | ✅ Fully Supported | Stages, actions, runOrder, artifacts                       |
+| **Buildkite**             | ✅ Fully Supported | Steps, depends_on, wait/block barriers, plugins, artifacts |
+| **Drone CI / Woodpecker** | ✅ Fully Supported | Multi-doc pipelines, depends_on DAG parsing, triggers      |
+| **Tekton Pipelines**      | ✅ Fully Supported | Pipeline/Task/PipelineRun CRDs, runAfter/finally support   |
+| **Argo Workflows**        | ✅ Fully Supported | DAG/steps templates, dependencies, when conditions         |
+| Travis CI                 | 🔜 Planned         | Stages, jobs, matrix                                       |
 
 **Want your CI platform supported?** [Open an issue](https://github.com/mackeh/PipelineX/issues/new?template=ci_platform_request.md)!
 
@@ -592,6 +597,10 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 | `cost`         | Estimate CI/CD costs and savings           | `pipelinex cost .github/workflows/ --team-size 10`                            |
 | `graph`        | Visualize pipeline DAG                     | `pipelinex graph ci.yml --format mermaid`                                     |
 | `simulate`     | Monte Carlo simulation                     | `pipelinex simulate ci.yml --runs 1000`                                       |
+| `explain`      | Generate actionable finding explanations   | `pipelinex explain ci.yml --runs-per-month 800`                               |
+| `what-if`      | Model DAG changes before editing config    | `pipelinex what-if ci.yml --modify "add-cache build 120"`                     |
+| `lint`         | Lint CI configs for schema/deprecations    | `pipelinex lint .github/workflows/ --format json`                             |
+| `compare`      | Compare two pipeline configs               | `pipelinex compare ci-old.yml ci-new.yml`                                     |
 | `docker`       | Analyze Dockerfiles                        | `pipelinex docker Dockerfile --optimize`                                      |
 | `select-tests` | Smart test selection                       | `pipelinex select-tests HEAD~1 HEAD`                                          |
 | `flaky`        | Detect flaky tests                         | `pipelinex flaky test-results/*.xml`                                          |
@@ -647,7 +656,7 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 
 |                          | PipelineX       | BuildPulse     | Datadog CI   | Trunk Analytics |
 | ------------------------ | --------------- | -------------- | ------------ | --------------- |
-| **Multi-platform**       | ✅ 8 CI systems | ❌ GitHub only | ✅           | ❌ GitHub only  |
+| **Multi-platform**       | ✅ 11 CI systems | ❌ GitHub only | ✅           | ❌ GitHub only  |
 | **Offline CLI**          | ✅              | ❌ SaaS only   | ❌ SaaS only | ❌ SaaS only    |
 | **Auto-generates fixes** | ✅              | ❌             | ❌           | ❌              |
 | **Smart test selection** | ✅              | ❌             | ❌           | ❌              |
@@ -750,7 +759,7 @@ cargo test --test integration_tests
          v
 ┌─────────────────┐      ┌──────────────────┐
 │  Parser Layer   │ ───> │  Pipeline DAG    │
-│ (5 platforms)   │      │  (petgraph)      │
+│ (11 platforms)  │      │  (petgraph)      │
 └─────────────────┘      └────────┬─────────┘
                                   │
                                   v
@@ -775,7 +784,7 @@ cargo test --test integration_tests
 
 **Key Components:**
 
-- **Universal Parser:** Normalizes 5 CI formats into unified DAG
+- **Universal Parser:** Normalizes 11 CI formats into a unified DAG
 - **Analyzer Suite:** 12 detectors for bottlenecks and antipatterns
 - **Optimizer Engine:** Generates production-ready configs
 - **Output Adapters:** Multiple formats for different workflows
@@ -812,6 +821,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 - [docs/MIGRATION_ASSISTANT.md](docs/MIGRATION_ASSISTANT.md) - GitHub Actions to GitLab CI migration assistant
 - [docs/MULTI_REPO_ANALYSIS.md](docs/MULTI_REPO_ANALYSIS.md) - Cross-repo orchestration and monorepo risk analysis
 - [docs/RUNNER_SIZING.md](docs/RUNNER_SIZING.md) - Resource-profiled runner right-sizing recommendations
+- [docs/EXPLAIN_WHATIF.md](docs/EXPLAIN_WHATIF.md) - Finding explanations and what-if scenario simulation
 - [docs/ALERTS.md](docs/ALERTS.md) - Threshold-based alert rules for duration, failure rate, and cost
 - [docs/GITHUB_APP_PR_ANALYSIS.md](docs/GITHUB_APP_PR_ANALYSIS.md) - GitHub App PR webhook analysis and automated PR comments
 - [docs/PLUGINS.md](docs/PLUGINS.md) - External plugin manifest and protocol
@@ -823,7 +833,7 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 ## 📊 Project Status
 
 - **Phase 1:** ✅ Core engine, GitHub Actions parser, CLI
-- **Phase 2:** ✅ Multi-platform (8 CI systems), simulation, visualization
+- **Phase 2:** ✅ Multi-platform (11 CI systems), simulation, visualization
 - **Phase 3:** ✅ **Complete!** Platform features (interactive DAG explorer, trend charts, flaky management UI, cost center dashboard, weekly digest API, GitHub App PR comments, webhook ingestion, threshold alerting, **one-click PR creation**, **team management & org-level views**)
 - **Phase 4:** ✅ Complete (benchmarks, optimization impact tracking, migration assistant, runner right-sizing, multi-repo analysis, public/enterprise API hardening, self-hosted deploy, REST API, VS Code extension, plugin scaffold)
 

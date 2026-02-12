@@ -1212,6 +1212,8 @@ fn format_delta(delta: i64) -> String {
     }
 }
 
+use pipelinex_core::whatif::WhatIfResult;
+
 use pipelinex_core::providers::github_api::PipelineStatistics;
 
 pub fn print_history_stats(stats: &PipelineStatistics) {
@@ -1356,5 +1358,105 @@ pub fn print_history_stats(stats: &PipelineStatistics) {
     println!("   • Spot flaky or unstable jobs");
     println!("   • Track performance trends over time");
     println!("   • Validate that optimizations reduced duration");
+    println!();
+}
+
+/// Print what-if simulation result to terminal.
+pub fn print_whatif_result(result: &WhatIfResult) {
+    println!();
+    println!("{}", " PipelineX What-If Simulator".bold());
+    println!();
+
+    // Modifications applied
+    if !result.modifications_applied.is_empty() {
+        println!(" {}", "Modifications Applied".bold().underline());
+        for m in &result.modifications_applied {
+            println!("   {} {}", "+".green(), m);
+        }
+        println!();
+    }
+
+    if !result.warnings.is_empty() {
+        println!(" {}", "Warnings".bold().yellow());
+        for w in &result.warnings {
+            println!("   {} {}", "!".yellow(), w);
+        }
+        println!();
+    }
+
+    // Duration comparison
+    println!(" {}", "Impact".bold().underline());
+    println!(
+        "   {:<25} {:>10} {:>10} {:>10}",
+        "Metric".underline(),
+        "Original".underline(),
+        "Modified".underline(),
+        "Delta".underline()
+    );
+
+    let dur_delta = if result.duration_delta_secs < 0.0 {
+        format!("-{}", format_duration(-result.duration_delta_secs))
+            .green()
+            .to_string()
+    } else if result.duration_delta_secs > 0.0 {
+        format!("+{}", format_duration(result.duration_delta_secs))
+            .red()
+            .to_string()
+    } else {
+        "0s".to_string()
+    };
+
+    println!(
+        "   {:<25} {:>10} {:>10} {:>10}",
+        "Duration",
+        format_duration(result.original_duration_secs),
+        format_duration(result.modified_duration_secs),
+        dur_delta,
+    );
+
+    println!(
+        "   {:<25} {:>10} {:>10} {:>10}",
+        "Jobs",
+        result.original_job_count,
+        result.modified_job_count,
+        format_delta(result.modified_job_count as i64 - result.original_job_count as i64),
+    );
+
+    println!(
+        "   {:<25} {:>10} {:>10} {:>10}",
+        "Findings",
+        result.original_findings_count,
+        result.modified_findings_count,
+        format_delta(result.modified_findings_count as i64 - result.original_findings_count as i64),
+    );
+
+    if result.improvement_pct.abs() > 0.1 {
+        let pct_str = if result.improvement_pct > 0.0 {
+            format!("{:.1}% faster", result.improvement_pct)
+                .green()
+                .bold()
+                .to_string()
+        } else {
+            format!("{:.1}% slower", -result.improvement_pct)
+                .red()
+                .bold()
+                .to_string()
+        };
+        println!();
+        println!("   Result: {}", pct_str);
+    }
+
+    // Critical path comparison
+    println!();
+    println!(" {}", "Critical Path".bold().underline());
+    println!(
+        "   Original: {}",
+        result.original_critical_path.join(" -> ")
+    );
+    println!(
+        "   Modified: {}",
+        result.modified_critical_path.join(" -> ").green()
+    );
+
     println!();
 }

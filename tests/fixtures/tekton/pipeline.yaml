@@ -1,0 +1,25 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: tekton-ci
+spec:
+  tasks:
+    - name: clone
+      taskRef:
+        name: git-clone
+    - name: build
+      taskRef:
+        name: golang-build
+      runAfter:
+        - clone
+    - name: test
+      taskRef:
+        name: golang-test
+      runAfter:
+        - clone
+    - name: deploy
+      taskRef:
+        name: kubectl-deploy
+      runAfter:
+        - build
+        - test

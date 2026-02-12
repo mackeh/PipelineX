@@ -2,6 +2,7 @@ pub mod analyzer;
 pub mod badge;
 pub mod cost;
 pub mod discovery;
+pub mod explainer;
 pub mod flaky_detector;
 pub mod graph;
 pub mod health_score;
@@ -21,6 +22,7 @@ pub mod security;
 pub mod signing;
 pub mod simulator;
 pub mod test_selector;
+pub mod whatif;
 
 pub use analyzer::report::{AnalysisReport, Finding, Severity};
 pub use flaky_detector::{FlakyCategory, FlakyDetector, FlakyReport, FlakyTest};
@@ -28,15 +30,18 @@ pub use linter::{lint, LintReport};
 pub use migration::{github_actions_to_gitlab_ci, MigrationResult};
 pub use multi_repo::{analyze_multi_repo, MultiRepoReport, RepoPipeline};
 pub use optimizer::Optimizer;
+pub use parser::argo::ArgoWorkflowsParser;
 pub use parser::aws_codepipeline::AwsCodePipelineParser;
 pub use parser::azure::AzurePipelinesParser;
 pub use parser::bitbucket::BitbucketParser;
 pub use parser::buildkite::BuildkiteParser;
 pub use parser::circleci::CircleCIParser;
 pub use parser::dag::{DagEdge, JobNode, PipelineDag, StepInfo};
+pub use parser::drone::DroneParser;
 pub use parser::github::GitHubActionsParser;
 pub use parser::gitlab::GitLabCIParser;
 pub use parser::jenkins::JenkinsParser;
+pub use parser::tekton::TektonParser;
 pub use plugins::{
     list_external_optimizer_plugins, run_external_analyzer_plugins, scaffold_manifest,
 };

@@ -46,7 +46,7 @@
 
 ### ✅ v2.1.x — Polish & Reliability (Complete)
 
-- Stability fixes and edge-case handling across all 8 CI parsers
+- Stability fixes and edge-case handling across supported CI parsers
 - Improved confidence scoring accuracy
 - Release checklist and publishing workflow
 - Implementation verification documentation
@@ -115,7 +115,7 @@
 
 #### AI-Powered Analysis
 
-- **LLM-powered optimisation explanations**: Natural language explanations of findings and fixes — *"Your test job waits for lint to finish, but they don't share any artifacts. Running them in parallel would save ~8 minutes per run and $43/month."*
+- **✅ LLM-powered optimisation explanations (implemented)**: `pipelinex explain` now provides finding-by-finding plain-English remediation with template fallback and optional Anthropic/OpenAI backends.
 - **AI config generation**: Describe what your pipeline should do in plain English, get an optimised CI config generated — *"Build a Node.js app, run tests in parallel across Node 18 and 20, deploy to AWS on main branch"*
 - **Predictive build time**: ML model trained on historical run data that predicts build time for a given PR before it even runs — *"This PR touches 3 test files, estimated CI time: 12 min (vs 31 min baseline)"*
 - **Anomaly detection**: Automatically flag pipeline runs that are significantly slower than usual — distinguish between legitimate slowdowns (new tests added) and regressions (cache miss, flaky infra)
@@ -125,14 +125,14 @@
 - **Live pipeline monitor**: Real-time dashboard showing active CI runs across all repos with live progress bars, step-level timing, and instant bottleneck highlighting — a "mission control" for your CI fleet
 - **"Pipeline Health Score" badge**: Embeddable shields.io-style badge for READMEs (`PipelineX Score: A+ | 94% optimised`) — gamification that drives adoption across open-source projects
 - **Cost leaderboard**: Org-wide ranking of repos by CI cost efficiency — *"Team Backend saved $2,400/month after applying PipelineX suggestions. Team Frontend: $890 potential savings remaining."* — turns optimisation into a friendly competition
-- **Interactive "what-if" simulator**: Browser-based tool where you can drag jobs around the DAG, add/remove dependencies, toggle caching on/off, and instantly see the projected impact on build time and cost — no actual config changes needed
+- **✅ Interactive "what-if" simulator (CLI implemented)**: `pipelinex what-if` supports dependency/cache/runner/duration scenario modeling and reports critical-path and duration deltas.
 - **Time-lapse replay**: Animate how a pipeline's performance has evolved over weeks/months — watch the DAG optimise in fast-forward as fixes are applied
 
 #### Ecosystem Expansion
 
-- **Tekton and Argo Workflows support**: Kubernetes-native CI/CD systems as first-class analysis targets
-- **Drone CI and Woodpecker CI support**: Lightweight CI systems popular in self-hosted setups
-- **MCP (Model Context Protocol) server**: Expose PipelineX as an MCP tool so AI coding assistants can analyse and optimise pipelines conversationally
+- **✅ Tekton and Argo Workflows support (implemented)**: Kubernetes-native CI/CD systems now parse as first-class analysis targets.
+- **✅ Drone CI and Woodpecker CI support (implemented)**: Lightweight/self-hosted pipeline configs now parse natively, including multi-doc workflows.
+- **✅ MCP (Model Context Protocol) server (implemented)**: PipelineX can now run as an MCP tool for AI assistant workflows.
 - **GitHub Marketplace App**: One-click install GitHub App that automatically analyses PRs touching CI configs and posts optimisation suggestions
 - **Terraform CI module**: IaC module that provisions PipelineX dashboard alongside your CI infrastructure
 - **JetBrains IDE plugin**: IntelliJ/GoLand/WebStorm plugin with inline pipeline analysis, DAG preview, and quick-fix actions
@@ -164,10 +164,10 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 **High-impact areas right now:**
 
 - 🔍 Adding antipattern detectors for new CI bottleneck patterns
-- 🔌 Expanding CI platform parser coverage (Tekton, Argo, Drone)
+- 🔌 Expanding CI parser depth (Tekton/Argo/Drone edge cases and enterprise variants)
 - 🔐 Pipeline security analysis rules (secret exposure, supply chain risks)
 - 📊 Dashboard visualisation improvements
 - 📚 Documentation, tutorials, and example configs
-- 🧪 Test fixtures for edge cases across all 8 CI platforms
+- 🧪 Test fixtures for edge cases across all 11 supported CI platforms
 
 Report bugs or request features via [GitHub Issues](https://github.com/mackeh/PipelineX/issues).

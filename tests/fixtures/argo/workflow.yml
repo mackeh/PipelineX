@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: argo-ci
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: clone
+            template: clone
+          - name: build
+            template: build
+            dependencies: [clone]
+          - name: test
+            template: test
+            dependencies: [clone]
+          - name: deploy
+            template: deploy
+            dependencies: [build, test]
+    - name: clone
+      container:
+        image: alpine/git
+        command: [sh, -c]
+        args: ["git clone https://example.com/repo.git"]
+    - name: build
+      container:
+        image: golang:1.21
+        command: [sh, -c]
+        args: ["go build ./..."]
+    - name: test
+      container:
+        image: golang:1.21
+        command: [sh, -c]
+        args: ["go test ./..."]
+    - name: deploy
+      container:
+        image: bitnami/kubectl
+        command: [sh, -c]
+        args: ["kubectl apply -f deploy.yaml"]

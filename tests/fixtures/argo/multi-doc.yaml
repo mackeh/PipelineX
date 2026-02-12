@@ -1,0 +1,37 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: shared-template
+spec:
+  templates:
+    - name: shared-step
+      container:
+        image: alpine:3
+        command: [sh, -c]
+        args: ["echo shared template"]
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  name: argo-ci
+spec:
+  entrypoint: main
+  templates:
+    - name: main
+      dag:
+        tasks:
+          - name: build
+            template: build
+          - name: test
+            template: test
+            dependencies: [build]
+    - name: build
+      container:
+        image: golang:1.21
+        command: [sh, -c]
+        args: ["go build ./..."]
+    - name: test
+      container:
+        image: golang:1.21
+        command: [sh, -c]
+        args: ["go test ./..."]
