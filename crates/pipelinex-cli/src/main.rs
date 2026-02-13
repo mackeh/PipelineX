@@ -22,7 +22,9 @@ use pipelinex_core::plugins;
 use pipelinex_core::profile_runner_sizing;
 use pipelinex_core::providers::GitHubClient;
 use pipelinex_core::test_selector::TestSelector;
+use std::io::{IsTerminal, Write};
 use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 #[derive(Parser)]
 #[command(
@@ -152,6 +154,14 @@ enum Commands {
         /// Output format (text, json)
         #[arg(short, long, default_value = "text")]
         format: String,
+
+        /// Maximum number of jobs to display in text output
+        #[arg(long, default_value_t = 12)]
+        top_jobs: usize,
+
+        /// Disable progress output for long simulations
+        #[arg(long)]
+        no_progress: bool,
     },
 
     /// Analyze a Dockerfile for optimization opportunities
@@ -522,7 +532,9 @@ async fn main() -> Result<()> {
             runs,
             variance,
             format,
-        } => cmd_simulate(&path, runs, variance, &format),
+            top_jobs,
+            no_progress,
+        } => cmd_simulate(&path, runs, variance, &format, top_jobs, no_progress),
         Commands::Docker {
             path,
             optimize,
@@ -1170,13 +1182,52 @@ fn cmd_graph(path: &Path, format: &str, output: Option<&std::path::Path>) -> Res
     Ok(())
 }
 
-fn cmd_simulate(path: &Path, runs: usize, variance: f64, format: &str) -> Result<()> {
+fn cmd_simulate(
+    path: &Path,
+    runs: usize,
+    variance: f64,
+    format: &str,
+    top_jobs: usize,
+    no_progress: bool,
+) -> Result<()> {
     if !path.is_file() {
         anyhow::bail!("'{}' is not a file.", path.display());
     }
 
     let dag = parse_pipeline(path)?;
-    let result = pipelinex_core::simulator::simulate(&dag, runs, variance);
+    let start = Instant::now();
+    let show_progress =
+        format != "json" && !no_progress && runs >= 5000 && std::io::stderr().is_terminal();
+
+    let result = if show_progress {
+        eprintln!(
+            "Running simulation: {} runs (variance {:.2})",
+            runs, variance
+        );
+        let mut last_pct = 0usize;
+        let mut stderr = std::io::stderr();
+        let result = pipelinex_core::simulator::simulate_with_progress(
+            &dag,
+            runs,
+            variance,
+            |completed, total| {
+                let pct = completed.saturating_mul(100) / total.max(1);
+                if pct != last_pct {
+                    last_pct = pct;
+                    eprint!("\r  Progress: {:>3}% ({}/{})", pct, completed, total);
+                    let _ = stderr.flush();
+                }
+            },
+        );
+        eprintln!(
+            "\r  Completed in {:.2}s{}",
+            start.elapsed().as_secs_f64(),
+            " ".repeat(24)
+        );
+        result
+    } else {
+        pipelinex_core::simulator::simulate(&dag, runs, variance)
+    };
 
     match format {
         "json" => {
@@ -1184,7 +1235,12 @@ fn cmd_simulate(path: &Path, runs: usize, variance: f64, format: &str) -> Result
             println!("{}", json);
         }
         _ => {
-            display::print_simulation_report(&dag.name, &result);
+            display::print_simulation_report(&dag.name, &result, top_jobs.max(1));
+            if result.job_stats.len() > top_jobs.max(1) {
+                println!(
+                    "Tip: use --format json for complete per-job stats or increase --top-jobs."
+                );
+            }
         }
     }
 

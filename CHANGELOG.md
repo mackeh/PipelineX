@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-02-13
+
+### Added
+- `pipelinex simulate` now supports `--top-jobs <N>` to cap long text tables and keep terminal output readable.
+- `pipelinex simulate` now supports `--no-progress` to disable progress rendering during large simulation runs.
+
+### Changed
+- `pipelinex simulate` now shows live progress for long text-mode simulations (5,000+ runs on a TTY), including completion time.
+- Text-mode simulation output now truncates per-job rows by default and guides users to `--format json` for complete machine-readable data.
+- `pipelinex analyze` now suggests `--format json` when large finding sets are printed in text mode.
+
 ## [2.4.0] - 2026-02-12
 
 ### Added

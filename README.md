@@ -524,6 +524,19 @@ Monte Carlo simulation with timing variance:
 $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 ```
 
+For large simulations, PipelineX shows progress in text mode (TTY) and you can tune output size:
+
+```bash
+# Show only top 8 jobs in the text table
+$ pipelinex simulate .github/workflows/ci.yml --runs 10000 --top-jobs 8
+
+# Disable progress rendering (for CI logs)
+$ pipelinex simulate .github/workflows/ci.yml --runs 10000 --no-progress
+
+# Full machine-readable output
+$ pipelinex simulate .github/workflows/ci.yml --runs 10000 --format json
+```
+
 <details>
 <summary><b>📊 Click to see simulation results</b></summary>
 
@@ -596,7 +609,7 @@ $ pipelinex simulate .github/workflows/ci.yml --runs 1000
 | `apply`        | Apply optimization & create PR (one-click) | `pipelinex apply .github/workflows/ci.yml --repo owner/repo`                  |
 | `cost`         | Estimate CI/CD costs and savings           | `pipelinex cost .github/workflows/ --team-size 10`                            |
 | `graph`        | Visualize pipeline DAG                     | `pipelinex graph ci.yml --format mermaid`                                     |
-| `simulate`     | Monte Carlo simulation                     | `pipelinex simulate ci.yml --runs 1000`                                       |
+| `simulate`     | Monte Carlo simulation                     | `pipelinex simulate ci.yml --runs 1000 --top-jobs 12`                         |
 | `explain`      | Generate actionable finding explanations   | `pipelinex explain ci.yml --runs-per-month 800`                               |
 | `what-if`      | Model DAG changes before editing config    | `pipelinex what-if ci.yml --modify "add-cache build 120"`                     |
 | `lint`         | Lint CI configs for schema/deprecations    | `pipelinex lint .github/workflows/ --format json`                             |

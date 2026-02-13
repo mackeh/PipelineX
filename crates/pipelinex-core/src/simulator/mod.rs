@@ -78,10 +78,36 @@ impl Rng {
 /// estimated duration (with configurable variance), then computes the total
 /// pipeline time by finding the critical path through the sampled DAG.
 pub fn simulate(dag: &PipelineDag, num_runs: usize, variance_factor: f64) -> SimulationResult {
+    simulate_internal(dag, num_runs, variance_factor, None::<fn(usize, usize)>)
+}
+
+/// Run a Monte Carlo simulation and report progress at regular intervals.
+pub fn simulate_with_progress<F>(
+    dag: &PipelineDag,
+    num_runs: usize,
+    variance_factor: f64,
+    on_progress: F,
+) -> SimulationResult
+where
+    F: FnMut(usize, usize),
+{
+    simulate_internal(dag, num_runs, variance_factor, Some(on_progress))
+}
+
+fn simulate_internal<F>(
+    dag: &PipelineDag,
+    num_runs: usize,
+    variance_factor: f64,
+    mut on_progress: Option<F>,
+) -> SimulationResult
+where
+    F: FnMut(usize, usize),
+{
     let mut rng = Rng::new(42);
     let mut run_durations: Vec<f64> = Vec::with_capacity(num_runs);
     let mut job_durations: HashMap<String, Vec<f64>> = HashMap::new();
     let mut job_critical_count: HashMap<String, usize> = HashMap::new();
+    let progress_interval = (num_runs / 20).max(1);
 
     // Initialize tracking
     for job in dag.graph.node_weights() {
@@ -94,7 +120,7 @@ pub fn simulate(dag: &PipelineDag, num_runs: usize, variance_factor: f64) -> Sim
         Err(_) => return empty_result(num_runs),
     };
 
-    for _ in 0..num_runs {
+    for run_idx in 0..num_runs {
         // Sample durations for each job
         let mut sampled: HashMap<NodeIndex, f64> = HashMap::new();
         for idx in dag.graph.node_indices() {
@@ -154,6 +180,13 @@ pub fn simulate(dag: &PipelineDag, num_runs: usize, variance_factor: f64) -> Sim
                     .entry(dag.graph[*pred].id.clone())
                     .and_modify(|c| *c += 1);
                 current = *pred;
+            }
+        }
+
+        if let Some(progress) = on_progress.as_mut() {
+            let completed = run_idx + 1;
+            if completed % progress_interval == 0 || completed == num_runs {
+                progress(completed, num_runs);
             }
         }
     }

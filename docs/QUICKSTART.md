@@ -336,6 +336,19 @@ pipelinex simulate .github/workflows/ci.yml
 
 Shows timing distributions, failure probabilities, and confidence intervals.
 
+For large runs, tune text output and automation behavior:
+
+```bash
+# Keep terminal tables short
+pipelinex simulate .github/workflows/ci.yml --runs 10000 --top-jobs 8
+
+# Disable progress output (useful in CI logs)
+pipelinex simulate .github/workflows/ci.yml --runs 10000 --no-progress
+
+# Use full machine-readable output
+pipelinex simulate .github/workflows/ci.yml --runs 10000 --format json
+```
+
 ### Pipeline Graph Visualization
 
 ```bash
@@ -459,7 +472,7 @@ ls .github/workflows/*.yml | xargs -P 4 -I {} pipelinex analyze {}
 | `pipelinex optimize <file> -o <output>` | Generate optimized pipeline |
 | `pipelinex diff <file>` | Show before/after comparison |
 | `pipelinex cost <directory>` | Calculate cost savings |
-| `pipelinex simulate <file>` | Run Monte Carlo simulation |
+| `pipelinex simulate <file> --top-jobs 12` | Run Monte Carlo simulation with bounded text output |
 | `pipelinex graph <file>` | Visualize pipeline DAG |
 | `pipelinex migrate <file> --to gitlab-ci` | Convert GitHub Actions workflow to GitLab CI |
 | `pipelinex multi-repo <dir>` | Analyze cross-repo orchestration and monorepo risks |

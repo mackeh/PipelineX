@@ -134,6 +134,12 @@ pub fn print_analysis_report(report: &AnalysisReport) {
             " Run {} to visualize the DAG",
             format!("pipelinex graph {}", report.source_file).cyan()
         );
+        if report.findings.len() > 10 {
+            println!(
+                " Run {} for machine-readable output",
+                format!("pipelinex analyze {} --format json", report.source_file).cyan()
+            );
+        }
     }
     println!();
 }
@@ -310,7 +316,7 @@ pub fn print_cost_report(
 }
 
 /// Print Monte Carlo simulation results.
-pub fn print_simulation_report(pipeline_name: &str, result: &SimulationResult) {
+pub fn print_simulation_report(pipeline_name: &str, result: &SimulationResult, max_jobs: usize) {
     println!();
     println!(
         "{}",
@@ -372,7 +378,8 @@ pub fn print_simulation_report(pipeline_name: &str, result: &SimulationResult) {
             "p90".underline(),
             "Crit.Path%".underline()
         );
-        for job in &result.job_stats {
+        let shown = result.job_stats.len().min(max_jobs.max(1));
+        for job in result.job_stats.iter().take(shown) {
             let crit_color = if job.on_critical_path_pct > 80.0 {
                 format!("{:.0}%", job.on_critical_path_pct)
                     .red()
@@ -392,6 +399,13 @@ pub fn print_simulation_report(pipeline_name: &str, result: &SimulationResult) {
                 format_duration(job.p50_duration_secs),
                 format_duration(job.p90_duration_secs),
                 crit_color,
+            );
+        }
+
+        if result.job_stats.len() > shown {
+            println!(
+                "   ... {} more jobs omitted from text view",
+                result.job_stats.len() - shown
             );
         }
     }
